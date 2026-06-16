@@ -21,6 +21,7 @@ mybatis-plus:
 catering:
   es:
     base-url: http://localhost:9201
+    index-alias: catering_post
   storage:
     minio:
       enabled: true

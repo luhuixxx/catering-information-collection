@@ -13,6 +13,8 @@
       <button class="search-btn" @click="goSearch">搜索</button>
     </view>
 
+    <button class="ai-entry" @click="goAiSearch">AI 智能搜索</button>
+
     <view class="type-grid">
       <view v-for="item in types" :key="item.value" class="type-card" @click="goList(item.value)">
         <text class="type-name">{{ item.label }}</text>
@@ -134,10 +136,19 @@ function goList(type: string) {
 }
 
 function goSearch() {
-  const params = [`type=RECRUIT`];
+  const params: string[] = [];
   if (keyword.value.trim()) params.push(`keyword=${encodeURIComponent(keyword.value.trim())}`);
   if (region.value.cityId) params.push(`cityId=${region.value.cityId}`);
-  uni.navigateTo({ url: `/pages/list/list?${params.join("&")}` });
+  if (region.value.districtId) params.push(`districtId=${region.value.districtId}`);
+  uni.navigateTo({ url: `/pages/list/list${params.length ? `?${params.join("&")}` : ""}` });
+}
+
+function goAiSearch() {
+  const params: string[] = [];
+  if (keyword.value.trim()) params.push(`query=${encodeURIComponent(keyword.value.trim())}`);
+  if (region.value.cityId) params.push(`cityId=${region.value.cityId}`);
+  if (region.value.districtId) params.push(`districtId=${region.value.districtId}`);
+  uni.navigateTo({ url: `/pages/ai-search/ai-search${params.length ? `?${params.join("&")}` : ""}` });
 }
 
 function goDetail(id: string) {
@@ -239,6 +250,15 @@ onShow(() => {
   border-radius: 14rpx;
   background: #2a2118;
   color: #fff6ea;
+  font-size: 26rpx;
+}
+
+.ai-entry {
+  height: 76rpx;
+  line-height: 76rpx;
+  border-radius: 16rpx;
+  background: linear-gradient(135deg, #c87941, #a85a24);
+  color: #fff;
   font-size: 26rpx;
 }
 

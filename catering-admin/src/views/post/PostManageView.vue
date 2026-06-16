@@ -4,8 +4,15 @@
       <div>
         <h2>信息检索</h2>
         <p>运营视角查看全量信息，支持按编号、标题、电话、城市和状态筛选。</p>
+        <p v-if="esHealth" class="es-status">
+          ES：{{ esHealth.available ? esHealth.clusterStatus : '不可用' }}
+          <template v-if="esHealth.indexExists"> · 索引 {{ esHealth.documentCount ?? 0 }} 条</template>
+        </p>
       </div>
-      <el-button :loading="loading" @click="load">刷新</el-button>
+      <div class="head-actions">
+        <el-button :loading="rebuilding" @click="rebuildEs">重建索引</el-button>
+        <el-button :loading="loading" @click="load">刷新</el-button>
+      </div>
     </div>
 
     <el-card shadow="never" class="filters">
@@ -85,8 +92,11 @@ import {
   topManagedPost,
   type ManagedPostItem,
 } from '@/api/post'
+import { fetchEsHealth, rebuildEsIndex, type EsHealth } from '@/api/search'
 
 const loading = ref(false)
+const rebuilding = ref(false)
+const esHealth = ref<EsHealth | null>(null)
 const rows = ref<ManagedPostItem[]>([])
 const total = ref(0)
 const detailVisible = ref(false)
@@ -142,7 +152,30 @@ async function cancelTop(postId: string) {
   }
 }
 
+async function loadEsHealth() {
+  try {
+    const res = await fetchEsHealth()
+    esHealth.value = res.data.data
+  } catch {
+    esHealth.value = null
+  }
+}
+
+async function rebuildEs() {
+  rebuilding.value = true
+  try {
+    const res = await rebuildEsIndex()
+    esHealth.value = res.data.data
+    ElMessage.success(`索引重建完成，同步 ${res.data.data.synced ?? 0} 条`)
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : '重建失败')
+  } finally {
+    rebuilding.value = false
+  }
+}
+
 load()
+loadEsHealth()
 </script>
 
 <style scoped>
@@ -166,6 +199,16 @@ load()
 .page-head p {
   margin: 8px 0 0;
   color: #7a6f63;
+}
+
+.es-status {
+  font-size: 13px;
+}
+
+.head-actions {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
 }
 
 .filters {

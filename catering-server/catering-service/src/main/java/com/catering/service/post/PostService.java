@@ -56,7 +56,7 @@ public interface PostService extends IService<Post> {
                                                String keyword, Integer minSalary, Integer maxSalary,
                                                String jobRole, String shopCategory,
                                                Boolean canCatering, Boolean canOpenFlame,
-                                               int page, int size);
+                                               String sort, int page, int size);
 
     PostDetailVO getPublicPostDetail(Long postId, Long viewerUserId);
 

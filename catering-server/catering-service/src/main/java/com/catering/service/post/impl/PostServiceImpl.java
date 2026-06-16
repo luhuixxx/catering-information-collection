@@ -43,6 +43,9 @@ import com.catering.service.post.dto.PostTopRequest;
 import com.catering.service.post.dto.RentPostUpsertRequest;
 import com.catering.service.post.dto.RecruitPostUpsertRequest;
 import com.catering.service.post.dto.TransferPostUpsertRequest;
+import com.catering.service.search.PostEsService;
+import com.catering.service.search.dto.PostSearchQuery;
+import com.catering.service.search.dto.PostSearchResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -73,6 +76,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     private final SysRegionMapper sysRegionMapper;
     private final AppUserMapper appUserMapper;
     private final SysConfigService sysConfigService;
+    private final PostEsService postEsService;
 
     @Override
     @Transactional
@@ -464,6 +468,11 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         record.setReasonText(nvl(request.getReasonText()));
         record.setOperatorAdminId(adminUserId);
         postAuditRecordMapper.insert(record);
+        if (targetStatus == PostStatus.APPROVED) {
+            postEsService.syncPost(postId);
+        } else {
+            postEsService.removePost(postId);
+        }
         return record;
     }
 
@@ -472,35 +481,98 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
                                                       String keyword, Integer minSalary, Integer maxSalary,
                                                       String jobRole, String shopCategory,
                                                       Boolean canCatering, Boolean canOpenFlame,
-                                                      int page, int size) {
+                                                      String sort, int page, int size) {
         expireStaleTopPosts();
-        Page<Post> pageReq = new Page<>(safePage(page), safeSize(size));
-        List<Long> filteredIds = typeFilterPostIds(postType, minSalary, maxSalary, jobRole, shopCategory, canCatering, canOpenFlame);
-        if (filteredIds != null && filteredIds.isEmpty()) {
+        PostSearchQuery query = PostSearchQuery.builder()
+                .keyword(keyword)
+                .postType(postType)
+                .cityId(cityId)
+                .districtId(districtId)
+                .minSalary(minSalary)
+                .maxSalary(maxSalary)
+                .jobRole(jobRole)
+                .shopCategory(shopCategory)
+                .canCatering(canCatering)
+                .canOpenFlame(canOpenFlame)
+                .sort(normalizeSort(sort))
+                .page(safePage(page))
+                .size(safeSize(size))
+                .build();
+        return postEsService.search(query)
+                .map(result -> toPageFromEs(result, safePage(page), safeSize(size)))
+                .orElseGet(() -> listPublicPostsByDb(query));
+    }
+
+    private PostPageVO<PostListItemVO> toPageFromEs(PostSearchResult result, int page, int size) {
+        if (result.getIds().isEmpty()) {
             return PostPageVO.<PostListItemVO>builder()
                     .total(0L)
-                    .page(safePage(page))
-                    .size(safeSize(size))
+                    .page(page)
+                    .size(size)
                     .records(List.of())
                     .build();
         }
-        LambdaQueryWrapper<Post> wrapper = baseVisiblePostWrapper(postType, cityId, districtId, keyword)
-                .orderByDesc(Post::getIsTop)
-                .orderByDesc(Post::getTopUntil)
-                .orderByDesc(Post::getCreatedAt);
-        if (filteredIds != null) {
-            wrapper.in(Post::getId, filteredIds);
-        }
-        Page<Post> result = postMapper.selectPage(pageReq, wrapper);
-        List<PostListItemVO> filtered = result.getRecords().stream()
+        List<Post> posts = postMapper.selectBatchIds(result.getIds());
+        Map<Long, Post> byId = posts.stream().collect(java.util.stream.Collectors.toMap(Post::getId, p -> p, (a, b) -> a));
+        List<PostListItemVO> records = result.getIds().stream()
+                .map(byId::get)
+                .filter(java.util.Objects::nonNull)
                 .map(this::toListItem)
                 .toList();
         return PostPageVO.<PostListItemVO>builder()
                 .total(result.getTotal())
+                .page(page)
+                .size(size)
+                .records(records)
+                .build();
+    }
+
+    private PostPageVO<PostListItemVO> listPublicPostsByDb(PostSearchQuery query) {
+        Page<Post> pageReq = new Page<>(query.getPage(), query.getSize());
+        List<Long> filteredIds = typeFilterPostIds(query.getPostType(), query.getMinSalary(), query.getMaxSalary(),
+                query.getJobRole(), query.getShopCategory(), query.getCanCatering(), query.getCanOpenFlame());
+        if (filteredIds != null && filteredIds.isEmpty()) {
+            return PostPageVO.<PostListItemVO>builder()
+                    .total(0L)
+                    .page(query.getPage())
+                    .size(query.getSize())
+                    .records(List.of())
+                    .build();
+        }
+        LambdaQueryWrapper<Post> wrapper = baseVisiblePostWrapper(query.getPostType(), query.getCityId(),
+                query.getDistrictId(), query.getKeyword());
+        applyDbSort(wrapper, query.getSort());
+        if (filteredIds != null) {
+            wrapper.in(Post::getId, filteredIds);
+        }
+        Page<Post> result = postMapper.selectPage(pageReq, wrapper);
+        return PostPageVO.<PostListItemVO>builder()
+                .total(result.getTotal())
                 .page(result.getCurrent())
                 .size(result.getSize())
-                .records(filtered)
+                .records(result.getRecords().stream().map(this::toListItem).toList())
                 .build();
+    }
+
+    private void applyDbSort(LambdaQueryWrapper<Post> wrapper, String sort) {
+        if ("LATEST".equalsIgnoreCase(sort)) {
+            wrapper.orderByDesc(Post::getCreatedAt);
+            return;
+        }
+        if ("EXPIRE_SOON".equalsIgnoreCase(sort)) {
+            wrapper.orderByAsc(Post::getExpireAt).orderByDesc(Post::getCreatedAt);
+            return;
+        }
+        wrapper.orderByDesc(Post::getIsTop)
+                .orderByDesc(Post::getTopUntil)
+                .orderByDesc(Post::getCreatedAt);
+    }
+
+    private String normalizeSort(String sort) {
+        if (sort == null || sort.isBlank()) {
+            return "DEFAULT";
+        }
+        return sort.trim().toUpperCase();
     }
 
     @Override
@@ -601,6 +673,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         post.setIsTop(1);
         post.setTopUntil(LocalDateTime.now().plusDays(days));
         postMapper.updateById(post);
+        postEsService.syncPost(postId);
     }
 
     @Override
@@ -613,6 +686,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         post.setIsTop(0);
         post.setTopUntil(null);
         postMapper.updateById(post);
+        postEsService.syncPost(postId);
     }
 
     private long countPublisherRejectedPosts(Long publisherUserId, Long currentPostId) {
@@ -656,7 +730,10 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
             wrapper.eq(Post::getDistrictId, districtId);
         }
         if (keyword != null && !keyword.isBlank()) {
-            wrapper.and(w -> w.like(Post::getTitle, keyword).or().like(Post::getDescription, keyword));
+            wrapper.and(w -> w.like(Post::getTitle, keyword)
+                    .or().like(Post::getDescription, keyword)
+                    .or().like(Post::getPostNo, keyword)
+                    .or().like(Post::getAddress, keyword));
         }
         return wrapper;
     }

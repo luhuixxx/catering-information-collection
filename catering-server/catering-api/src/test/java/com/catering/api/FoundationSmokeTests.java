@@ -8,6 +8,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,6 +51,20 @@ class FoundationSmokeTests {
     }
 
     @Test
+    void shouldAllowAnonymousAiSearchWithDegradedFallback() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        String body = "{\"query\":\"杭州大厨 8000 以上\",\"page\":1,\"size\":5}";
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                url("/api/app/search/ai"), new HttpEntity<>(body, headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).contains("\"code\":0");
+        assertThat(response.getBody()).contains("\"degraded\":true");
+    }
+
+    @Test
     void shouldLoadMybatisMapperAndServiceBeans() {
         assertThat(postService).isNotNull();
         assertThat(postMapper).isNotNull();
@@ -57,4 +74,3 @@ class FoundationSmokeTests {
         return "http://localhost:" + port + path;
     }
 }
-

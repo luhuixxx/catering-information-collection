@@ -24,6 +24,7 @@ import com.catering.service.governance.dto.PostReportVO;
 import com.catering.service.governance.dto.UserBanRequest;
 import com.catering.service.post.dto.PostListItemVO;
 import com.catering.service.post.dto.PostPageVO;
+import com.catering.service.search.PostEsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +42,7 @@ public class GovernanceService {
     private final AppUserMapper appUserMapper;
     private final SysRegionMapper sysRegionMapper;
     private final PostAuditRecordMapper postAuditRecordMapper;
+    private final PostEsService postEsService;
 
     @Transactional
     public void favorite(Long userId, Long postId) {
@@ -151,6 +153,7 @@ public class GovernanceService {
                 post.setStatus(PostStatus.OFFLINE);
                 postMapper.updateById(post);
                 writeAudit(post.getId(), adminUserId, "OFFLINE", action, nvl(request.getNote()));
+                postEsService.removePost(post.getId());
             }
         }
         if ("BAN".equals(action)) {
@@ -223,6 +226,7 @@ public class GovernanceService {
                 post.setStatus(PostStatus.OFFLINE);
                 postMapper.updateById(post);
                 writeAudit(post.getId(), adminUserId, "OFFLINE", "BAN_USER", reason);
+                postEsService.removePost(post.getId());
             }
         }
     }

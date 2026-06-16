@@ -41,6 +41,14 @@
 			}
 		},
 		{
+			"path": "pages/ai-search/ai-search",
+			"style": {
+				"navigationBarTitleText": "AI 搜索",
+				"navigationBarBackgroundColor": "#FFF6EA",
+				"navigationBarTextStyle": "black"
+			}
+		},
+		{
 			"path": "pages/detail/detail",
 			"style": {
 				"navigationBarTitleText": "信息详情",

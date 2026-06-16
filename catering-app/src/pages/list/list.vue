@@ -21,11 +21,16 @@
         <button :class="['chip', canCatering === true ? 'active' : '']" @click="toggleCatering">可餐饮</button>
         <button :class="['chip', canOpenFlame === true ? 'active' : '']" @click="toggleOpenFlame">可明火</button>
       </view>
+      <view class="sort-row">
+        <button :class="['sort-chip', sort === 'DEFAULT' ? 'active' : '']" @click="setSort('DEFAULT')">综合</button>
+        <button :class="['sort-chip', sort === 'LATEST' ? 'active' : '']" @click="setSort('LATEST')">最新</button>
+        <button :class="['sort-chip', sort === 'EXPIRE_SOON' ? 'active' : '']" @click="setSort('EXPIRE_SOON')">即将过期</button>
+      </view>
       <button class="primary" :loading="loading" @click="reload">筛选</button>
     </view>
 
     <view class="list">
-      <view v-if="loading" class="state">加载中...</view>
+      <view v-if="loading && records.length === 0" class="state">加载中...</view>
       <view v-else-if="records.length === 0" class="state">暂无符合条件的信息</view>
       <view v-for="item in records" v-else :key="item.id" class="post-card" @click="goDetail(item.id)">
         <image v-if="item.coverImage" class="cover" :src="item.coverImage" mode="aspectFill" />
@@ -42,18 +47,20 @@
           </view>
         </view>
       </view>
+      <view v-if="records.length > 0" class="state">{{ loading ? "加载中..." : hasMore ? "上拉加载更多" : "已经到底了" }}</view>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { onLoad, onShow } from "@dcloudio/uni-app";
+import { onLoad, onReachBottom, onShow } from "@dcloudio/uni-app";
 import RegionPicker from "@/components/RegionPicker.vue";
 import { fetchPublicPosts, type PublicPostItem } from "@/api/post";
 
-const postType = ref("RECRUIT");
+const postType = ref("");
 const keyword = ref("");
+const sort = ref("DEFAULT");
 const jobRole = ref("");
 const shopCategory = ref("");
 const minSalary = ref<number | undefined>();
@@ -62,20 +69,24 @@ const canCatering = ref<boolean | undefined>();
 const canOpenFlame = ref<boolean | undefined>();
 const region = ref<{ cityId?: number; districtId?: number; label?: string }>({});
 const loading = ref(false);
+const page = ref(1);
+const size = 20;
 const total = ref(0);
 const records = ref<PublicPostItem[]>([]);
 
-const typeLabel = computed(() => labelOf(postType.value));
-const showRoleFilter = computed(() => ["RECRUIT", "JOB_SEEK", "FRANCHISE"].includes(postType.value));
-const showCategoryFilter = computed(() => ["RECRUIT", "TRANSFER", "JOB_SEEK", "FRANCHISE"].includes(postType.value));
-const showAmountFilter = computed(() => ["RECRUIT", "JOB_SEEK", "RENT"].includes(postType.value));
+const typeLabel = computed(() => keyword.value.trim() && !postType.value ? "搜索结果" : labelOf(postType.value || "ALL"));
+const showRoleFilter = computed(() => postType.value && ["RECRUIT", "JOB_SEEK", "FRANCHISE"].includes(postType.value));
+const showCategoryFilter = computed(() => postType.value && ["RECRUIT", "TRANSFER", "JOB_SEEK", "FRANCHISE"].includes(postType.value));
+const showAmountFilter = computed(() => postType.value && ["RECRUIT", "JOB_SEEK", "RENT"].includes(postType.value));
 const rolePlaceholder = computed(() => postType.value === "FRANCHISE" ? "品牌名" : postType.value === "JOB_SEEK" ? "期望岗位" : "岗位");
 const categoryPlaceholder = computed(() => postType.value === "JOB_SEEK" ? "擅长菜系" : postType.value === "FRANCHISE" ? "加盟品类" : postType.value === "RECRUIT" ? "门店类型" : "经营类型");
 const amountMinPlaceholder = computed(() => postType.value === "RENT" ? "最低月租" : "最低薪资");
 const amountMaxPlaceholder = computed(() => postType.value === "RENT" ? "最高月租" : "最高薪资");
+const hasMore = computed(() => records.value.length < total.value);
 
 function labelOf(type: string) {
   const map: Record<string, string> = {
+    ALL: "全部信息",
     RECRUIT: "招聘信息",
     TRANSFER: "转让信息",
     RENT: "出租信息",
@@ -89,12 +100,14 @@ function dateText(value: string) {
   return value ? value.replace("T", " ").slice(5, 16) : "";
 }
 
-async function load() {
+async function load(append = false) {
+  if (loading.value) return;
   loading.value = true;
   try {
     const res = await fetchPublicPosts({
-      postType: postType.value,
+      postType: postType.value || undefined,
       keyword: keyword.value,
+      sort: sort.value,
       cityId: region.value.cityId,
       districtId: region.value.districtId,
       jobRole: showRoleFilter.value ? jobRole.value : undefined,
@@ -103,13 +116,16 @@ async function load() {
       maxSalary: showAmountFilter.value ? maxSalary.value : undefined,
       canCatering: postType.value === "RENT" ? canCatering.value : undefined,
       canOpenFlame: postType.value === "RENT" ? canOpenFlame.value : undefined,
-      page: 1,
-      size: 20,
+      page: page.value,
+      size,
     });
-    records.value = res.data.records;
+    records.value = append ? records.value.concat(res.data.records) : res.data.records;
     total.value = res.data.total;
   } catch (e) {
-    records.value = [];
+    if (!append) {
+      records.value = [];
+      total.value = 0;
+    }
     uni.showToast({ title: e instanceof Error ? e.message : "加载失败", icon: "none" });
   } finally {
     loading.value = false;
@@ -117,7 +133,19 @@ async function load() {
 }
 
 function reload() {
+  page.value = 1;
   load();
+}
+
+function loadMore() {
+  if (loading.value || !hasMore.value) return;
+  page.value += 1;
+  load(true);
+}
+
+function setSort(value: string) {
+  sort.value = value;
+  reload();
 }
 
 function toggleCatering() {
@@ -133,7 +161,7 @@ function goDetail(id: string) {
 }
 
 onLoad((query) => {
-  if (typeof query?.type === "string") {
+  if (typeof query?.type === "string" && query.type) {
     postType.value = query.type;
   }
   if (typeof query?.keyword === "string") {
@@ -148,6 +176,7 @@ onLoad((query) => {
 });
 
 onShow(load);
+onReachBottom(loadMore);
 </script>
 
 <style scoped>
@@ -221,6 +250,26 @@ onShow(load);
 }
 
 .chip.active {
+  color: #fff;
+  background: #2a2118;
+}
+
+.sort-row {
+  display: flex;
+  gap: 12rpx;
+}
+
+.sort-chip {
+  flex: 1;
+  height: 68rpx;
+  line-height: 68rpx;
+  border-radius: 14rpx;
+  color: #6f6255;
+  background: #faf5ee;
+  font-size: 24rpx;
+}
+
+.sort-chip.active {
   color: #fff;
   background: #2a2118;
 }

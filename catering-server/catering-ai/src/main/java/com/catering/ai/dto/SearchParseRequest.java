@@ -12,6 +12,7 @@ public class SearchParseRequest {
 
     private String query;
     private SearchContext context;
+    private List<Message> messages;
 
     @Data
     @Builder
@@ -19,6 +20,15 @@ public class SearchParseRequest {
         private String province;
         private List<String> postTypes;
         private List<String> cities;
+        private List<String> districts;
         private List<String> jobTypes;
+        private List<String> shopCategories;
+    }
+
+    @Data
+    @Builder
+    public static class Message {
+        private String role;
+        private String content;
     }
 }

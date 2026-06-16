@@ -94,11 +94,25 @@ function logout() {
 
 .menu :deep(.el-menu-item) {
   color: rgba(246, 240, 232, 0.78);
+  border-radius: 8px;
+  margin: 4px 10px;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.menu :deep(.el-menu-item:hover),
+.menu :deep(.el-menu-item:focus) {
+  color: #f6e8d8;
+  background: rgba(200, 121, 65, 0.12) !important;
 }
 
 .menu :deep(.el-menu-item.is-active) {
   color: #ffd6aa;
-  background: rgba(200, 121, 65, 0.18);
+  background: rgba(200, 121, 65, 0.22) !important;
+}
+
+.menu :deep(.el-menu-item.is-active:hover) {
+  color: #ffe0b8;
+  background: rgba(200, 121, 65, 0.28) !important;
 }
 
 .header {

@@ -47,6 +47,14 @@ export interface PublicPostPage {
   records: PublicPostItem[];
 }
 
+export interface AiSearchResponse {
+  reply: string;
+  degraded: boolean;
+  confidence?: number;
+  parsedFilters: Record<string, unknown>;
+  list: PublicPostPage;
+}
+
 export interface PublicPostDetail extends PublicPostItem {
   status: string;
   address: string;
@@ -120,12 +128,16 @@ export function fetchEditablePost(postId: string) {
   return request<Record<string, unknown>>({ url: `/app/posts/${postId}/edit`, method: "GET" });
 }
 
-export function fetchPublicPosts(params: Record<string, string | number | undefined>) {
+export function fetchPublicPosts(params: Record<string, string | number | boolean | undefined>) {
   const query = Object.entries(params)
     .filter(([, value]) => value !== undefined && value !== "")
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
     .join("&");
   return request<PublicPostPage>({ url: `/app/post-browse${query ? `?${query}` : ""}`, method: "GET" });
+}
+
+export function aiSearch(payload: { query: string; cityId?: number; districtId?: number; page?: number; size?: number }) {
+  return request<AiSearchResponse>({ url: "/app/search/ai", method: "POST", data: payload });
 }
 
 export function fetchPublicPostDetail(postId: string) {
