@@ -21,6 +21,14 @@ mybatis-plus:
 catering:
   es:
     base-url: http://localhost:9201
+  storage:
+    minio:
+      enabled: true
+      endpoint: http://localhost:9000
+      access-key: minioadmin
+      secret-key: minioadmin
+      bucket: catering-media
+      expire-seconds: 900
   ai:
     enabled: true
     base-url: http://localhost:8000

@@ -7,13 +7,13 @@ import java.time.LocalDateTime;
 
 @Data
 @Builder
-public class PendingPostVO {
+public class MyPostVO {
     private String id;
     private String postNo;
     private String postType;
+    private String status;
     private String title;
-    private Long cityId;
-    private Long districtId;
-    private Long publisherUserId;
+    private String coverImage;
     private LocalDateTime createdAt;
+    private LocalDateTime expireAt;
 }

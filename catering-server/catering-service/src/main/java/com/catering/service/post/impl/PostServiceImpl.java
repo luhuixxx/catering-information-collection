@@ -19,6 +19,7 @@ import com.catering.model.enums.PostType;
 import com.catering.model.enums.SalaryType;
 import com.catering.service.config.SysConfigService;
 import com.catering.service.post.PostService;
+import com.catering.service.post.dto.MyPostVO;
 import com.catering.service.post.dto.PendingPostVO;
 import com.catering.service.post.dto.PostAuditActionRequest;
 import com.catering.service.post.dto.RecruitPostUpsertRequest;
@@ -113,6 +114,107 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     }
 
     @Override
+    public List<MyPostVO> listMyPosts(Long userId, String status, int page, int size) {
+        Page<Post> pageReq = new Page<>(page, size);
+        LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<Post>()
+                .eq(Post::getPublisherUserId, userId)
+                .orderByDesc(Post::getCreatedAt);
+        if (status != null && !status.isBlank()) {
+            wrapper.eq(Post::getStatus, PostStatus.valueOf(status));
+        }
+        Page<Post> result = postMapper.selectPage(pageReq, wrapper);
+        return result.getRecords().stream().map(p -> MyPostVO.builder()
+                .id(String.valueOf(p.getId()))
+                .postNo(p.getPostNo())
+                .postType(p.getPostType().name())
+                .status(p.getStatus().name())
+                .title(p.getTitle())
+                .coverImage(p.getCoverImage())
+                .createdAt(p.getCreatedAt())
+                .expireAt(p.getExpireAt())
+                .build()).toList();
+    }
+
+    @Override
+    public Map<String, Object> getEditablePost(Long userId, Long postId) {
+        Post post = postMapper.selectById(postId);
+        if (post == null || !post.getPublisherUserId().equals(userId)) {
+            throw new BusinessException(404, "帖子不存在");
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("post", post);
+        result.put("images", postImageMapper.selectList(new LambdaQueryWrapper<PostImage>()
+                .eq(PostImage::getPostId, postId)
+                .orderByAsc(PostImage::getSortNo)));
+        if (post.getPostType() == PostType.RECRUIT) {
+            result.put("ext", postRecruitMapper.selectById(postId));
+        } else if (post.getPostType() == PostType.TRANSFER) {
+            result.put("ext", postTransferMapper.selectById(postId));
+        }
+        return result;
+    }
+
+    @Override
+    @Transactional
+    public void updateRecruitDraft(Long userId, Long postId, RecruitPostUpsertRequest request) {
+        Post post = requireOwnedEditablePost(userId, postId, PostType.RECRUIT);
+        applyBasePostUpdate(post, request.getTitle(), request.getCityId(), request.getDistrictId(), request.getAddress(),
+                request.getContactName(), request.getContactPhone(), request.getContactWechat(), request.getDescription(),
+                request.getImages(), request.getExpireDays());
+        postMapper.updateById(post);
+
+        PostRecruit recruit = postRecruitMapper.selectById(postId);
+        if (recruit == null) {
+            recruit = new PostRecruit();
+            recruit.setPostId(postId);
+            postRecruitMapper.insert(recruit);
+        }
+        recruit.setJobRole(request.getJobRole());
+        recruit.setJobRoleOther(nvl(request.getJobRoleOther()));
+        recruit.setShopCategory(nvl(request.getShopCategory()));
+        recruit.setSalaryType(SalaryType.valueOf(request.getSalaryType()));
+        recruit.setSalaryMin(request.getSalaryMin());
+        recruit.setSalaryMax(request.getSalaryMax());
+        recruit.setProvideBoard(defaultInt(request.getProvideBoard(), 0));
+        recruit.setHeadcount(defaultInt(request.getHeadcount(), 1));
+        recruit.setExpRequirement(nvl(request.getExpRequirement()));
+        recruit.setAgeRequirement(nvl(request.getAgeRequirement()));
+        recruit.setCuisines(nvl(request.getCuisines()));
+        recruit.setWorkTimeDesc(nvl(request.getWorkTimeDesc()));
+        postRecruitMapper.updateById(recruit);
+        replaceImages(postId, request.getImages());
+    }
+
+    @Override
+    @Transactional
+    public void updateTransferDraft(Long userId, Long postId, TransferPostUpsertRequest request) {
+        Post post = requireOwnedEditablePost(userId, postId, PostType.TRANSFER);
+        applyBasePostUpdate(post, request.getTitle(), request.getCityId(), request.getDistrictId(), request.getAddress(),
+                request.getContactName(), request.getContactPhone(), request.getContactWechat(), request.getDescription(),
+                request.getImages(), request.getExpireDays());
+        postMapper.updateById(post);
+
+        PostTransfer transfer = postTransferMapper.selectById(postId);
+        if (transfer == null) {
+            transfer = new PostTransfer();
+            transfer.setPostId(postId);
+            postTransferMapper.insert(transfer);
+        }
+        transfer.setShopCategory(request.getShopCategory());
+        transfer.setAreaSqm(request.getAreaSqm());
+        transfer.setRentMonthly(request.getRentMonthly());
+        transfer.setRentNegotiable(defaultInt(request.getRentNegotiable(), 0));
+        transfer.setTransferFee(request.getTransferFee());
+        transfer.setFeeNegotiable(defaultInt(request.getFeeNegotiable(), 0));
+        transfer.setIncludeEquipment(defaultInt(request.getIncludeEquipment(), 0));
+        transfer.setOperating(defaultInt(request.getOperating(), 0));
+        transfer.setRevenueDesc(nvl(request.getRevenueDesc()));
+        transfer.setReason(nvl(request.getReason()));
+        postTransferMapper.updateById(transfer);
+        replaceImages(postId, request.getImages());
+    }
+
+    @Override
     public List<PendingPostVO> listPendingPosts(String postType, int page, int size) {
         Page<Post> pageReq = new Page<>(page, size);
         LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<Post>()
@@ -123,7 +225,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         }
         Page<Post> result = postMapper.selectPage(pageReq, wrapper);
         return result.getRecords().stream().map(p -> PendingPostVO.builder()
-                .id(p.getId())
+                .id(String.valueOf(p.getId()))
                 .postNo(p.getPostNo())
                 .postType(p.getPostType().name())
                 .title(p.getTitle())
@@ -226,6 +328,41 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
             image.setSortNo(i);
             postImageMapper.insert(image);
         }
+    }
+
+    private void replaceImages(Long postId, List<String> images) {
+        postImageMapper.delete(new LambdaQueryWrapper<PostImage>().eq(PostImage::getPostId, postId));
+        saveImages(postId, images);
+    }
+
+    private Post requireOwnedEditablePost(Long userId, Long postId, PostType expectedType) {
+        Post post = postMapper.selectById(postId);
+        if (post == null || !post.getPublisherUserId().equals(userId)) {
+            throw new BusinessException(404, "帖子不存在");
+        }
+        if (post.getPostType() != expectedType) {
+            throw new BusinessException(400, "帖子类型不匹配");
+        }
+        if (post.getStatus() != PostStatus.DRAFT && post.getStatus() != PostStatus.REJECTED) {
+            throw new BusinessException(400, "当前状态不允许编辑");
+        }
+        return post;
+    }
+
+    private void applyBasePostUpdate(Post post, String title, Long cityId, Long districtId, String address,
+                                     String contactName, String contactPhone, String contactWechat, String description,
+                                     List<String> images, Integer expireDays) {
+        post.setTitle(title);
+        post.setCityId(cityId);
+        post.setDistrictId(districtId);
+        post.setAddress(nvl(address));
+        post.setContactName(contactName);
+        post.setContactPhone(contactPhone);
+        post.setContactWechat(nvl(contactWechat));
+        post.setDescription(nvl(description));
+        post.setCoverImage(images == null || images.isEmpty() ? "" : images.get(0));
+        post.setImagesCount(images == null ? 0 : images.size());
+        post.setExpireAt(LocalDateTime.now().plusDays(expireDays == null || expireDays <= 0 ? 15 : expireDays));
     }
 
     private String generatePostNo() {

@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 /**
- * 用户端 API 占位：/api/app/**
+ * 用户端基础连通性接口。
  */
 @RestController
 @RequestMapping("/api/app")

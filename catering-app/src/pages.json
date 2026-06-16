@@ -23,6 +23,14 @@
 				"navigationBarBackgroundColor": "#FFF6EA",
 				"navigationBarTextStyle": "black"
 			}
+		},
+		{
+			"path": "pages/my-posts/my-posts",
+			"style": {
+				"navigationBarTitleText": "我的发布",
+				"navigationBarBackgroundColor": "#FFF6EA",
+				"navigationBarTextStyle": "black"
+			}
 		}
 	],
 	"globalStyle": {

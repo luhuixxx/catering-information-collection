@@ -40,16 +40,16 @@ public class AdminPostAuditController {
 
     @Operation(summary = "待审核详情")
     @GetMapping("/{postId}/detail")
-    public Result<Map<String, Object>> detail(@PathVariable Long postId) {
-        return Result.ok(postService.getPendingPostDetail(postId));
+    public Result<Map<String, Object>> detail(@PathVariable String postId) {
+        return Result.ok(postService.getPendingPostDetail(Long.parseLong(postId)));
     }
 
     @Operation(summary = "审核操作：APPROVE / REJECT")
     @PostMapping("/{postId}/audit")
-    public Result<PostAuditRecord> audit(@PathVariable Long postId,
+    public Result<PostAuditRecord> audit(@PathVariable String postId,
                                          @Valid @RequestBody PostAuditActionRequest request,
                                          Authentication authentication) {
         Long adminUserId = ((AuthUserPrincipal) authentication.getPrincipal()).getUserId();
-        return Result.ok(postService.auditPendingPost(adminUserId, postId, request));
+        return Result.ok(postService.auditPendingPost(adminUserId, Long.parseLong(postId), request));
     }
 }

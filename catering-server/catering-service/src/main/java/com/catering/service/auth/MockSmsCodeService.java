@@ -21,6 +21,11 @@ public class MockSmsCodeService {
     }
 
     public boolean verify(String phone, String code) {
+        // Dev convenience: allow fixed mock code without a prior "send"
+        if (code != null && code.equals(authProperties.getSmsMockCode())) {
+            codes.remove(phone);
+            return true;
+        }
         CodeEntry entry = codes.get(phone);
         if (entry == null) {
             return false;

@@ -20,6 +20,14 @@
       <text class="tip">登录后可查看发布信息中的联系电话</text>
     </view>
 
+    <view class="card action-card">
+      <view class="actions">
+        <button class="primary-btn" @click="goPublish">发布信息</button>
+        <button class="ghost-btn" @click="goMyPosts">我的发布</button>
+      </view>
+      <text class="tip">先保存草稿，再提交审核；审核结果在“我的发布”里查看</text>
+    </view>
+
     <view class="card status-card">
       <text class="status-label">后端服务</text>
       <text class="status-value">{{ healthText }}</text>
@@ -54,6 +62,22 @@ function refreshAuth() {
 
 function goLogin() {
   uni.navigateTo({ url: "/pages/login/login" });
+}
+
+function goPublish() {
+  if (!loggedIn.value) {
+    goLogin();
+    return;
+  }
+  uni.navigateTo({ url: "/pages/publish/publish" });
+}
+
+function goMyPosts() {
+  if (!loggedIn.value) {
+    goLogin();
+    return;
+  }
+  uni.navigateTo({ url: "/pages/my-posts/my-posts" });
 }
 
 function logout() {

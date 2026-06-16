@@ -13,6 +13,11 @@
     <RegionPicker v-model="region" />
 
     <view class="card">
+      <view class="token-bar">
+        <text class="token-label">上传凭证</text>
+        <text class="token-value">{{ uploadTokenText }}</text>
+      </view>
+
       <view class="field">
         <text class="label">标题</text>
         <input v-model="form.title" class="input" placeholder="例如：西湖区某店招聘厨师/收银" />
@@ -36,6 +41,21 @@
       <view class="field">
         <text class="label">补充说明</text>
         <textarea v-model="form.description" class="textarea" placeholder="可填写店铺情况、要求、优势等" />
+      </view>
+
+      <view class="field">
+        <text class="label">图片上传（直传 MinIO）</text>
+        <view class="img-row">
+          <button class="mini-btn" :disabled="uploading || images.length >= 9" @click="chooseAndUploadImage">
+            {{ uploading ? "上传中..." : "选择图片" }}
+          </button>
+          <text class="upload-tip">最多 9 张（点击已上传地址可移除）</text>
+        </view>
+        <view class="chips">
+          <text v-for="(img, idx) in images" :key="img + idx" class="chip" @click="removeImage(idx)">
+            {{ idx + 1 }}. {{ shortUrl(img) }}
+          </text>
+        </view>
       </view>
 
       <view v-if="type === 'RECRUIT'" class="block">
@@ -62,7 +82,8 @@
         </view>
       </view>
 
-      <button class="primary" :loading="saving" @click="saveDraft">保存草稿</button>
+      <view v-if="currentStatus" class="status-bar">当前状态：{{ currentStatus }}</view>
+      <button class="primary" :loading="saving" @click="saveDraft">{{ isEditMode ? "保存修改" : "保存草稿" }}</button>
       <button class="ghost" :disabled="!lastPostId" :loading="submitting" @click="submit">
         提交审核（需先保存草稿）
       </button>
@@ -74,9 +95,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
+import { onLoad } from "@dcloudio/uni-app";
 import { isLoggedIn } from "@/api/request";
-import { saveRecruitDraft, saveTransferDraft, submitPost } from "@/api/post";
+import {
+  fetchEditablePost,
+  fetchUploadToken,
+  saveRecruitDraft,
+  saveTransferDraft,
+  submitPost,
+  updateRecruitDraft,
+  updateTransferDraft,
+  uploadImageToMinio,
+} from "@/api/post";
 import RegionPicker from "@/components/RegionPicker.vue";
 
 const type = ref<"RECRUIT" | "TRANSFER">("RECRUIT");
@@ -104,7 +135,12 @@ const transfer = ref({
 const saving = ref(false);
 const submitting = ref(false);
 const error = ref("");
-const lastPostId = ref<number | null>(null);
+const lastPostId = ref<string | null>(null);
+const images = ref<string[]>([]);
+const uploadTokenText = ref("获取中...");
+const uploading = ref(false);
+const isEditMode = ref(false);
+const currentStatus = ref("");
 
 function onSalaryChange(e: any) {
   recruit.value.salaryType = salaryTypes[e.detail.value] || "MONTHLY";
@@ -131,25 +167,35 @@ async function saveDraft() {
       contactName: form.value.contactName,
       contactPhone: form.value.contactPhone,
       description: form.value.description,
-      images: [],
+      images: images.value,
       expireDays: 15,
     };
     if (type.value === "RECRUIT") {
-      const res = await saveRecruitDraft({
+      const payload = {
         ...base,
         jobRole: recruit.value.jobRole,
         salaryType: recruit.value.salaryType,
-      });
-      lastPostId.value = res.data.postId;
+      };
+      if (isEditMode.value && lastPostId.value) {
+        await updateRecruitDraft(lastPostId.value, payload);
+      } else {
+        const res = await saveRecruitDraft(payload);
+        lastPostId.value = res.data.postId;
+      }
     } else {
-      const res = await saveTransferDraft({
+      const payload = {
         ...base,
         shopCategory: transfer.value.shopCategory,
         areaSqm: transfer.value.areaSqm,
-      });
-      lastPostId.value = res.data.postId;
+      };
+      if (isEditMode.value && lastPostId.value) {
+        await updateTransferDraft(lastPostId.value, payload);
+      } else {
+        const res = await saveTransferDraft(payload);
+        lastPostId.value = res.data.postId;
+      }
     }
-    uni.showToast({ title: "草稿已保存", icon: "success" });
+    uni.showToast({ title: isEditMode.value ? "修改已保存" : "草稿已保存", icon: "success" });
   } catch (e) {
     error.value = e instanceof Error ? e.message : "保存失败";
   } finally {
@@ -170,6 +216,87 @@ async function submit() {
     submitting.value = false;
   }
 }
+
+async function chooseAndUploadImage() {
+  if (images.value.length >= 9) {
+    uni.showToast({ title: "最多上传9张", icon: "none" });
+    return;
+  }
+  uploading.value = true;
+  try {
+    const chooseRes = await new Promise<UniApp.ChooseImageSuccessCallbackResult>((resolve, reject) => {
+      uni.chooseImage({
+        count: 1,
+        sizeType: ["compressed"],
+        sourceType: ["album", "camera"],
+        success: resolve,
+        fail: reject,
+      });
+    });
+    const filePath = chooseRes.tempFilePaths[0];
+    if (!filePath) {
+      uploading.value = false;
+      return;
+    }
+    const objectUrl = await uploadImageToMinio(filePath);
+    images.value = [...images.value, objectUrl].slice(0, 9);
+    uni.showToast({ title: "图片已上传", icon: "success" });
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : "图片上传失败";
+  } finally {
+    uploading.value = false;
+  }
+}
+
+function removeImage(idx: number) {
+  images.value = images.value.filter((_, i) => i !== idx);
+}
+
+function shortUrl(url: string) {
+  return url.length > 30 ? `${url.slice(0, 30)}...` : url;
+}
+
+onMounted(async () => {
+  try {
+    const res = await fetchUploadToken("bootstrap.jpg", "image/jpeg");
+    uploadTokenText.value = `${res.data.provider}（${new Date(res.data.expireAt).toLocaleTimeString()} 到期）`;
+  } catch {
+    uploadTokenText.value = "获取失败";
+  }
+});
+
+onLoad(async (query) => {
+  const postId = typeof query?.postId === "string" ? query.postId : "";
+  if (!postId) return;
+  isEditMode.value = true;
+  lastPostId.value = postId;
+  try {
+    const res = await fetchEditablePost(postId);
+    const data = res.data as any;
+    const post = data.post || {};
+    const ext = data.ext || {};
+    const imgList = (data.images || []) as Array<{ url?: string }>;
+    type.value = post.postType === "TRANSFER" ? "TRANSFER" : "RECRUIT";
+    currentStatus.value = post.status || "";
+    form.value.title = post.title || "";
+    form.value.address = post.address || "";
+    form.value.contactName = post.contactName || "";
+    form.value.contactPhone = post.contactPhone || "";
+    form.value.description = post.description || "";
+    region.value.cityId = post.cityId;
+    region.value.districtId = post.districtId;
+    images.value = imgList.map((i) => i.url || "").filter(Boolean);
+    if (type.value === "RECRUIT") {
+      recruit.value.jobRole = ext.jobRole || "";
+      recruit.value.salaryType = ext.salaryType || "MONTHLY";
+    } else {
+      transfer.value.shopCategory = ext.shopCategory || "";
+      transfer.value.areaSqm = ext.areaSqm || 60;
+    }
+  } catch (e) {
+    uni.showToast({ title: e instanceof Error ? e.message : "加载编辑数据失败", icon: "none" });
+  }
+});
 </script>
 
 <style scoped>
@@ -219,6 +346,26 @@ async function submit() {
   box-shadow: 0 16rpx 48rpx rgba(42, 33, 24, 0.08);
 }
 
+.token-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-bottom: 22rpx;
+  padding: 16rpx 18rpx;
+  border-radius: 14rpx;
+  background: rgba(200, 121, 65, 0.12);
+}
+
+.token-label {
+  color: #7a6f63;
+  font-size: 22rpx;
+}
+
+.token-value {
+  color: #2a2118;
+  font-size: 22rpx;
+}
+
 .field {
   margin-bottom: 22rpx;
 }
@@ -242,6 +389,42 @@ async function submit() {
   border-radius: 16rpx;
   background: #faf5ee;
   font-size: 28rpx;
+}
+
+.img-row {
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
+}
+
+.mini-btn {
+  min-width: 160rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  border-radius: 14rpx;
+  background: #f1e7da;
+  color: #a85a24;
+  font-size: 24rpx;
+}
+
+.upload-tip {
+  color: #9a8f82;
+  font-size: 22rpx;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 12rpx;
+}
+
+.chip {
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  background: #f8ede1;
+  color: #7a6f63;
+  font-size: 22rpx;
 }
 
 .picker {
@@ -283,6 +466,15 @@ async function submit() {
   margin-top: 12rpx;
   color: #d64545;
   font-size: 24rpx;
+}
+
+.status-bar {
+  margin-bottom: 12rpx;
+  padding: 12rpx 16rpx;
+  border-radius: 12rpx;
+  font-size: 24rpx;
+  color: #7a6f63;
+  background: #f5ecdf;
 }
 </style>
 

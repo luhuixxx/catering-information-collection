@@ -1,4 +1,4 @@
--- seed data placeholder
+-- seed data
 USE catering;
 
 SET NAMES utf8mb4;

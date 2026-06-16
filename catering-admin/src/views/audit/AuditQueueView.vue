@@ -32,9 +32,23 @@
       <div v-if="!loading && rows.length === 0" class="empty">暂无待审数据</div>
     </el-card>
 
-    <el-dialog v-model="detailVisible" title="审核详情" width="720px" destroy-on-close>
+    <el-dialog v-model="detailVisible" title="审核详情" width="760px" destroy-on-close>
       <div v-loading="detailLoading" class="detail">
-        <pre class="json">{{ detailJson }}</pre>
+        <template v-if="detailPost">
+          <div class="kv">
+            <span>标题</span><b>{{ detailPost.title }}</b>
+            <span>类型</span><b>{{ detailPost.postType }}</b>
+            <span>状态</span><b>{{ detailPost.status }}</b>
+            <span>联系人</span><b>{{ detailPost.contactName }}</b>
+            <span>电话</span><b>{{ detailPost.contactPhone }}</b>
+            <span>地区</span><b>{{ detailPost.cityId }} / {{ detailPost.districtId }}</b>
+          </div>
+          <p class="desc">{{ detailPost.description || '无补充说明' }}</p>
+          <div v-if="detailImages.length" class="imgs">
+            <img v-for="(img, i) in detailImages" :key="img + i" :src="img" class="img" />
+          </div>
+          <pre class="json">{{ detailJson }}</pre>
+        </template>
       </div>
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>
@@ -56,6 +70,11 @@ const detailVisible = ref(false)
 const detailLoading = ref(false)
 const detail = ref<Record<string, unknown> | null>(null)
 const detailJson = computed(() => (detail.value ? JSON.stringify(detail.value, null, 2) : ''))
+const detailPost = computed(() => (detail.value?.post || null) as Record<string, any> | null)
+const detailImages = computed(() => {
+  const arr = (detail.value?.images || []) as Array<{ url?: string }>
+  return arr.map((i) => i.url || '').filter(Boolean)
+})
 
 async function load() {
   loading.value = true
@@ -69,7 +88,7 @@ async function load() {
   }
 }
 
-async function openDetail(postId: number) {
+async function openDetail(postId: string) {
   detailVisible.value = true
   detailLoading.value = true
   detail.value = null
@@ -83,7 +102,7 @@ async function openDetail(postId: number) {
   }
 }
 
-async function approve(postId: number) {
+async function approve(postId: string) {
   try {
     await auditPost(postId, 'APPROVE')
     ElMessage.success('已通过')
@@ -93,7 +112,7 @@ async function approve(postId: number) {
   }
 }
 
-async function reject(postId: number) {
+async function reject(postId: string) {
   try {
     const { value } = await ElMessageBox.prompt('请输入驳回原因（可空）', '驳回', {
       confirmButtonText: '确定驳回',
@@ -165,6 +184,43 @@ load()
   color: #f6f0e8;
   max-height: 56vh;
   overflow: auto;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: 70px 1fr 70px 1fr;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+}
+
+.kv span {
+  color: #8b7f73;
+  font-size: 12px;
+}
+
+.kv b {
+  color: #2a2118;
+  font-size: 13px;
+}
+
+.desc {
+  margin: 8px 0 12px;
+  color: #51463a;
+}
+
+.imgs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.img {
+  width: 90px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #eee2d4;
 }
 </style>
 

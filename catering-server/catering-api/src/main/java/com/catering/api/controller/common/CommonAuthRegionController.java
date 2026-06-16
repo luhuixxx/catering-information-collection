@@ -30,7 +30,7 @@ public class CommonAuthRegionController {
     private final AppAuthService appAuthService;
     private final SysRegionService sysRegionService;
 
-    @Operation(summary = "发送短信验证码（Mock）")
+    @Operation(summary = "发送短信验证码（开发环境固定码）")
     @PostMapping("/auth/sms/send")
     public Result<Map<String, Object>> sendSms(@Valid @RequestBody SmsSendRequest request) {
         return Result.ok(appAuthService.sendSmsCode(request));
