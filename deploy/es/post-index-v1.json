@@ -1,0 +1,98 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "refresh_interval": "1s"
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "id": { "type": "long" },
+      "postNo": { "type": "keyword" },
+      "postType": { "type": "keyword" },
+      "status": { "type": "keyword" },
+
+      "provinceId": { "type": "long" },
+      "cityId": { "type": "long" },
+      "districtId": { "type": "long" },
+
+      "title": {
+        "type": "text",
+        "fields": {
+          "kw": { "type": "keyword", "ignore_above": 256 }
+        }
+      },
+      "description": { "type": "text" },
+      "address": { "type": "text" },
+
+      "isTop": { "type": "boolean" },
+      "topUntil": { "type": "date" },
+      "expireAt": { "type": "date" },
+      "createdAt": { "type": "date" },
+      "updatedAt": { "type": "date" },
+
+      "coverImage": { "type": "keyword", "ignore_above": 512 },
+
+      "recruit": {
+        "properties": {
+          "jobRole": { "type": "keyword" },
+          "shopCategory": { "type": "keyword" },
+          "salaryType": { "type": "keyword" },
+          "salaryMin": { "type": "integer" },
+          "salaryMax": { "type": "integer" },
+          "provideBoard": { "type": "boolean" },
+          "expRequirement": { "type": "keyword" },
+          "cuisines": { "type": "keyword" }
+        }
+      },
+
+      "transfer": {
+        "properties": {
+          "shopCategory": { "type": "keyword" },
+          "areaSqm": { "type": "integer" },
+          "rentMonthly": { "type": "integer" },
+          "rentNegotiable": { "type": "boolean" },
+          "transferFee": { "type": "integer" },
+          "feeNegotiable": { "type": "boolean" },
+          "includeEquipment": { "type": "boolean" },
+          "operating": { "type": "boolean" }
+        }
+      },
+
+      "rent": {
+        "properties": {
+          "areaSqm": { "type": "integer" },
+          "rentMonthly": { "type": "integer" },
+          "rentNegotiable": { "type": "boolean" },
+          "entryFee": { "type": "integer" },
+          "entryFeeNegotiable": { "type": "boolean" },
+          "canCatering": { "type": "boolean" },
+          "canOpenFlame": { "type": "boolean" },
+          "publisherIdentity": { "type": "keyword" }
+        }
+      },
+
+      "jobSeek": {
+        "properties": {
+          "desiredRoles": { "type": "keyword" },
+          "desiredCities": { "type": "keyword" },
+          "desiredDistricts": { "type": "keyword" },
+          "workYears": { "type": "integer" },
+          "cuisines": { "type": "keyword" },
+          "salaryMin": { "type": "integer" },
+          "salaryMax": { "type": "integer" }
+        }
+      },
+
+      "franchise": {
+        "properties": {
+          "brandName": { "type": "keyword" },
+          "category": { "type": "keyword" },
+          "investmentDesc": { "type": "text" },
+          "franchiseDesc": { "type": "text" }
+        }
+      }
+    }
+  }
+}
+

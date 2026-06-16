@@ -1,0 +1,54 @@
+spring:
+  application:
+    name: catering-api
+  profiles:
+    active: dev
+  datasource:
+    url: jdbc:mysql://localhost:3306/catering?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+catering:
+  ai:
+    enabled: true
+    base-url: http://localhost:8000
+    api-key: dev-internal-key
+    degrade-on-failure: true
+  security:
+    jwt:
+      issuer: catering-api
+      secret: change-this-in-production
+      access-token-expire-seconds: 86400
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+      - http://localhost:5174
+
+server:
+  port: 8080
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  pattern:
+    level: "%5p [traceId:%X{traceId}]"

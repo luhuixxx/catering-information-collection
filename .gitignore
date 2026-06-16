@@ -1,0 +1,35 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# Java
+target/
+*.class
+*.jar
+*.war
+hs_err_pid*
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+.DS_Store
+
+# UniApp
+catering-app/unpackage/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.pytest_cache/
+*.egg-info/
+
+# Logs
+logs/
+*.log
