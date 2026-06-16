@@ -23,6 +23,11 @@ const router = createRouter({
           name: 'regions',
           component: () => import('@/views/region/RegionManageView.vue'),
         },
+        {
+          path: 'audit',
+          name: 'audit',
+          component: () => import('@/views/audit/AuditQueueView.vue'),
+        },
       ],
     },
   ],

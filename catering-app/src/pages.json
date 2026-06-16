@@ -15,6 +15,14 @@
 				"navigationBarBackgroundColor": "#FFF6EA",
 				"navigationBarTextStyle": "black"
 			}
+		},
+		{
+			"path": "pages/publish/publish",
+			"style": {
+				"navigationBarTitleText": "发布",
+				"navigationBarBackgroundColor": "#FFF6EA",
+				"navigationBarTextStyle": "black"
+			}
 		}
 	],
 	"globalStyle": {

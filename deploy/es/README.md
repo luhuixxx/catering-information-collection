@@ -5,7 +5,7 @@
 ## 创建索引（Windows PowerShell）
 
 ```powershell
-.\deploy\es\create-post-index.ps1 -EsUrl http://localhost:9200
+.\deploy\es\create-post-index.ps1 -EsUrl http://localhost:9201
 ```
 
 默认：
