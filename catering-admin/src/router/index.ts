@@ -33,6 +33,16 @@ const router = createRouter({
           name: 'posts',
           component: () => import('@/views/post/PostManageView.vue'),
         },
+        {
+          path: 'reports',
+          name: 'reports',
+          component: () => import('@/views/governance/ReportManageView.vue'),
+        },
+        {
+          path: 'users',
+          name: 'users',
+          component: () => import('@/views/governance/UserManageView.vue'),
+        },
       ],
     },
   ],

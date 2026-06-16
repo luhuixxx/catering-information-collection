@@ -46,13 +46,13 @@ public class AppPostBrowseController {
     @Operation(summary = "公开信息详情，登录后返回完整电话")
     @GetMapping("/{postId}")
     public Result<PostDetailVO> detail(@PathVariable Long postId, Authentication authentication) {
-        return Result.ok(postService.getPublicPostDetail(postId, isAppUser(authentication)));
+        return Result.ok(postService.getPublicPostDetail(postId, appUserId(authentication)));
     }
 
-    private boolean isAppUser(Authentication authentication) {
+    private Long appUserId(Authentication authentication) {
         if (authentication == null || !(authentication.getPrincipal() instanceof AuthUserPrincipal principal)) {
-            return false;
+            return null;
         }
-        return principal.getUserType() == AuthUserType.APP_USER;
+        return principal.getUserType() == AuthUserType.APP_USER ? principal.getUserId() : null;
     }
 }

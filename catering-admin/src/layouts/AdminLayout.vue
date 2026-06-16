@@ -12,6 +12,8 @@
         <el-menu-item index="/">工作台</el-menu-item>
         <el-menu-item index="/audit">审核队列</el-menu-item>
         <el-menu-item index="/posts">信息检索</el-menu-item>
+        <el-menu-item index="/reports">举报处理</el-menu-item>
+        <el-menu-item index="/users">用户治理</el-menu-item>
         <el-menu-item index="/regions">地区管理</el-menu-item>
       </el-menu>
     </el-aside>

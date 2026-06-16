@@ -36,8 +36,9 @@
       <view class="actions">
         <button class="primary-btn" @click="goPublish">发布信息</button>
         <button class="ghost-btn" @click="goMyPosts">我的发布</button>
+        <button class="ghost-btn" @click="goFavorites">我的收藏</button>
       </view>
-      <text class="tip">先保存草稿，再提交审核；审核结果在“我的发布”里查看</text>
+      <text class="tip">先保存草稿，再提交审核；看中的信息可先收藏，稍后再联系</text>
     </view>
 
     <view class="latest">
@@ -115,6 +116,14 @@ function goMyPosts() {
     return;
   }
   uni.navigateTo({ url: "/pages/my-posts/my-posts" });
+}
+
+function goFavorites() {
+  if (!loggedIn.value) {
+    goLogin();
+    return;
+  }
+  uni.navigateTo({ url: "/pages/favorites/favorites" });
 }
 
 function goList(type: string) {
@@ -357,6 +366,7 @@ onShow(() => {
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 14rpx;
 }
 

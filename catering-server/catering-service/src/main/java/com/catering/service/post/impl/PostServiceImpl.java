@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.catering.common.exception.BusinessException;
+import com.catering.dao.mapper.AppUserMapper;
 import com.catering.dao.mapper.PostAuditRecordMapper;
 import com.catering.dao.mapper.PostFranchiseMapper;
 import com.catering.dao.mapper.PostImageMapper;
@@ -14,6 +15,7 @@ import com.catering.dao.mapper.PostRentMapper;
 import com.catering.dao.mapper.PostRecruitMapper;
 import com.catering.dao.mapper.PostTransferMapper;
 import com.catering.dao.mapper.SysRegionMapper;
+import com.catering.model.entity.AppUser;
 import com.catering.model.entity.PostFranchise;
 import com.catering.model.entity.PostJobSeek;
 import com.catering.model.entity.PostRent;
@@ -69,11 +71,13 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     private final PostImageMapper postImageMapper;
     private final PostAuditRecordMapper postAuditRecordMapper;
     private final SysRegionMapper sysRegionMapper;
+    private final AppUserMapper appUserMapper;
     private final SysConfigService sysConfigService;
 
     @Override
     @Transactional
     public Long saveRecruitDraft(Long userId, RecruitPostUpsertRequest request) {
+        ensureActiveUser(userId);
         validateRecruitRequest(request);
         Post post = buildBasePost(userId, PostType.RECRUIT, request.getTitle(), request.getCityId(), request.getDistrictId(),
                 request.getAddress(), request.getContactName(), request.getContactPhone(), request.getContactWechat(),
@@ -103,6 +107,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     @Override
     @Transactional
     public Long saveTransferDraft(Long userId, TransferPostUpsertRequest request) {
+        ensureActiveUser(userId);
         validateTransferRequest(request);
         Post post = buildBasePost(userId, PostType.TRANSFER, request.getTitle(), request.getCityId(), request.getDistrictId(),
                 request.getAddress(), request.getContactName(), request.getContactPhone(), request.getContactWechat(),
@@ -130,6 +135,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     @Override
     @Transactional
     public Long saveRentDraft(Long userId, RentPostUpsertRequest request) {
+        ensureActiveUser(userId);
         validateRentRequest(request);
         Post post = buildBasePost(userId, PostType.RENT, request.getTitle(), request.getCityId(), request.getDistrictId(),
                 request.getAddress(), request.getContactName(), request.getContactPhone(), request.getContactWechat(),
@@ -147,6 +153,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     @Override
     @Transactional
     public Long saveJobSeekDraft(Long userId, JobSeekPostUpsertRequest request) {
+        ensureActiveUser(userId);
         validateJobSeekRequest(request);
         Post post = buildBasePost(userId, PostType.JOB_SEEK, request.getTitle(), request.getCityId(), request.getDistrictId(),
                 request.getAddress(), request.getContactName(), request.getContactPhone(), request.getContactWechat(),
@@ -164,6 +171,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     @Override
     @Transactional
     public Long saveFranchiseDraft(Long userId, FranchisePostUpsertRequest request) {
+        ensureActiveUser(userId);
         validateFranchiseRequest(request);
         Post post = buildBasePost(userId, PostType.FRANCHISE, request.getTitle(), request.getCityId(), request.getDistrictId(),
                 request.getAddress(), request.getContactName(), request.getContactPhone(), request.getContactWechat(),
@@ -181,6 +189,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     @Override
     @Transactional
     public void submitForAudit(Long userId, Long postId) {
+        ensureActiveUser(userId);
         Post post = postMapper.selectById(postId);
         if (post == null || !post.getPublisherUserId().equals(userId)) {
             throw new BusinessException(404, "帖子不存在");
@@ -243,6 +252,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     @Override
     @Transactional
     public void updateRecruitDraft(Long userId, Long postId, RecruitPostUpsertRequest request) {
+        ensureActiveUser(userId);
         validateRecruitRequest(request);
         Post post = requireOwnedEditablePost(userId, postId, PostType.RECRUIT);
         applyBasePostUpdate(post, request.getTitle(), request.getCityId(), request.getDistrictId(), request.getAddress(),
@@ -275,6 +285,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     @Override
     @Transactional
     public void updateTransferDraft(Long userId, Long postId, TransferPostUpsertRequest request) {
+        ensureActiveUser(userId);
         validateTransferRequest(request);
         Post post = requireOwnedEditablePost(userId, postId, PostType.TRANSFER);
         applyBasePostUpdate(post, request.getTitle(), request.getCityId(), request.getDistrictId(), request.getAddress(),
@@ -305,6 +316,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     @Override
     @Transactional
     public void updateRentDraft(Long userId, Long postId, RentPostUpsertRequest request) {
+        ensureActiveUser(userId);
         validateRentRequest(request);
         Post post = requireOwnedEditablePost(userId, postId, PostType.RENT);
         applyBasePostUpdate(post, request.getTitle(), request.getCityId(), request.getDistrictId(), request.getAddress(),
@@ -325,6 +337,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     @Override
     @Transactional
     public void updateJobSeekDraft(Long userId, Long postId, JobSeekPostUpsertRequest request) {
+        ensureActiveUser(userId);
         validateJobSeekRequest(request);
         Post post = requireOwnedEditablePost(userId, postId, PostType.JOB_SEEK);
         applyBasePostUpdate(post, request.getTitle(), request.getCityId(), request.getDistrictId(), request.getAddress(),
@@ -345,6 +358,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     @Override
     @Transactional
     public void updateFranchiseDraft(Long userId, Long postId, FranchisePostUpsertRequest request) {
+        ensureActiveUser(userId);
         validateFranchiseRequest(request);
         Post post = requireOwnedEditablePost(userId, postId, PostType.FRANCHISE);
         applyBasePostUpdate(post, request.getTitle(), request.getCityId(), request.getDistrictId(), request.getAddress(),
@@ -490,7 +504,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     }
 
     @Override
-    public PostDetailVO getPublicPostDetail(Long postId, boolean loggedIn) {
+    public PostDetailVO getPublicPostDetail(Long postId, Long viewerUserId) {
         Post post = postMapper.selectById(postId);
         if (post == null) {
             throw new BusinessException(404, "信息不存在");
@@ -498,8 +512,10 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         boolean visible = post.getStatus() == PostStatus.APPROVED
                 && post.getExpireAt() != null
                 && post.getExpireAt().isAfter(LocalDateTime.now());
-        boolean phoneVisible = visible && loggedIn;
-        return toDetail(post, visible, phoneVisible, phoneNotice(visible, loggedIn));
+        boolean loggedIn = viewerUserId != null;
+        boolean activeViewer = loggedIn && isActiveUser(viewerUserId);
+        boolean phoneVisible = visible && activeViewer;
+        return toDetail(post, visible, phoneVisible, phoneNotice(visible, loggedIn, activeViewer));
     }
 
     @Override
@@ -935,11 +951,28 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 4);
     }
 
-    private String phoneNotice(boolean visible, boolean loggedIn) {
+    private String phoneNotice(boolean visible, boolean loggedIn, boolean activeViewer) {
         if (!visible) {
             return "信息已失效，暂不可查看电话";
         }
-        return loggedIn ? "已登录，可拨打电话" : "登录后查看完整电话";
+        if (!loggedIn) {
+            return "登录后查看完整电话";
+        }
+        return activeViewer ? "已登录，可拨打电话" : "账号已被封禁，暂不可查看电话";
+    }
+
+    private void ensureActiveUser(Long userId) {
+        if (!isActiveUser(userId)) {
+            throw new BusinessException(403, "账号已被封禁，暂不能发布或编辑信息");
+        }
+    }
+
+    private boolean isActiveUser(Long userId) {
+        if (userId == null) {
+            return false;
+        }
+        AppUser user = appUserMapper.selectById(userId);
+        return user != null && (user.getBannedUntil() == null || !user.getBannedUntil().isAfter(LocalDateTime.now()));
     }
 
     private String nonBlank(String value, String fallback) {

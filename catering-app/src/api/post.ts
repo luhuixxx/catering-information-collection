@@ -61,6 +61,12 @@ export interface PublicPostDetail extends PublicPostItem {
   ext: Record<string, unknown>;
 }
 
+export interface FavoritePostItem {
+  favoriteId: string;
+  favoritedAt: string;
+  post: PublicPostItem;
+}
+
 export function saveRecruitDraft(payload: Record<string, unknown>) {
   return request<{ postId: string }>({ url: "/app/posts/recruit/draft", method: "POST", data: payload });
 }
@@ -124,6 +130,26 @@ export function fetchPublicPosts(params: Record<string, string | number | undefi
 
 export function fetchPublicPostDetail(postId: string) {
   return request<PublicPostDetail>({ url: `/app/post-browse/${postId}`, method: "GET" });
+}
+
+export function favoritePost(postId: string) {
+  return request<void>({ url: `/app/posts/${postId}/favorite`, method: "POST" });
+}
+
+export function unfavoritePost(postId: string) {
+  return request<void>({ url: `/app/posts/${postId}/favorite`, method: "DELETE" });
+}
+
+export function fetchFavoriteStatus(postId: string) {
+  return request<{ favorited: boolean }>({ url: `/app/posts/${postId}/favorite`, method: "GET" });
+}
+
+export function fetchFavorites() {
+  return request<FavoritePostItem[]>({ url: "/app/favorites", method: "GET" });
+}
+
+export function reportPost(postId: string, payload: { reason: string; description?: string; evidenceImage?: string }) {
+  return request<void>({ url: `/app/posts/${postId}/report`, method: "POST", data: payload });
 }
 
 export function fetchUploadToken(fileName: string, contentType: string) {

@@ -58,7 +58,7 @@ public interface PostService extends IService<Post> {
                                                Boolean canCatering, Boolean canOpenFlame,
                                                int page, int size);
 
-    PostDetailVO getPublicPostDetail(Long postId, boolean loggedIn);
+    PostDetailVO getPublicPostDetail(Long postId, Long viewerUserId);
 
     PostDetailVO getAdminPostDetail(Long postId);
 

@@ -31,6 +31,11 @@
           <text v-if="detail.address" class="address">地址：{{ detail.address }}</text>
         </view>
 
+        <view class="actions">
+          <button class="ghost" @click="toggleFavorite">{{ favorited ? "取消收藏" : "收藏" }}</button>
+          <button class="ghost danger" @click="openReport">举报</button>
+        </view>
+
         <view class="contact">
           <view>
             <text class="contact-label">联系电话</text>
@@ -48,11 +53,13 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
-import { fetchPublicPostDetail, type PublicPostDetail } from "@/api/post";
+import { fetchFavoriteStatus, favoritePost, fetchPublicPostDetail, reportPost, unfavoritePost, type PublicPostDetail } from "@/api/post";
+import { isLoggedIn } from "@/api/request";
 
 const postId = ref("");
 const loading = ref(false);
 const detail = ref<PublicPostDetail | null>(null);
+const favorited = ref(false);
 
 const images = computed(() => detail.value?.images?.length ? detail.value.images : detail.value?.coverImage ? [detail.value.coverImage] : []);
 const extRows = computed(() => {
@@ -133,11 +140,67 @@ async function load() {
   try {
     const res = await fetchPublicPostDetail(postId.value);
     detail.value = res.data;
+    if (isLoggedIn()) {
+      const fav = await fetchFavoriteStatus(postId.value);
+      favorited.value = fav.data.favorited;
+    } else {
+      favorited.value = false;
+    }
   } catch {
     detail.value = null;
   } finally {
     loading.value = false;
   }
+}
+
+function requireLogin() {
+  if (isLoggedIn()) return true;
+  uni.navigateTo({ url: `/pages/login/login?redirect=${encodeURIComponent(`/pages/detail/detail?id=${postId.value}`)}` });
+  return false;
+}
+
+async function toggleFavorite() {
+  if (!detail.value || !requireLogin()) return;
+  try {
+    if (favorited.value) {
+      await unfavoritePost(postId.value);
+      favorited.value = false;
+      uni.showToast({ title: "已取消收藏", icon: "none" });
+    } else {
+      await favoritePost(postId.value);
+      favorited.value = true;
+      uni.showToast({ title: "已收藏", icon: "success" });
+    }
+  } catch (e) {
+    uni.showToast({ title: e instanceof Error ? e.message : "操作失败", icon: "none" });
+  }
+}
+
+function openReport() {
+  if (!detail.value || !requireLogin()) return;
+  const labels = ["虚假信息", "诈骗风险", "重复发布", "辱骂骚扰", "其他"];
+  const values = ["FAKE", "SCAM", "SPAM", "ABUSE", "OTHER"];
+  uni.showActionSheet({
+    itemList: labels,
+    success: ({ tapIndex }) => {
+      const reason = values[tapIndex] || "OTHER";
+      uni.showModal({
+        title: "举报说明",
+        editable: true,
+        placeholderText: "可补充说明，帮助运营判断",
+        confirmText: "提交",
+        success: async (modal) => {
+          if (!modal.confirm) return;
+          try {
+            await reportPost(postId.value, { reason, description: modal.content || "" });
+            uni.showToast({ title: "已提交举报", icon: "success" });
+          } catch (e) {
+            uni.showToast({ title: e instanceof Error ? e.message : "举报失败", icon: "none" });
+          }
+        },
+      });
+    },
+  });
 }
 
 function handleCall() {
@@ -181,7 +244,8 @@ onShow(load);
 
 .headline,
 .section,
-.contact {
+.contact,
+.actions {
   padding: 24rpx;
   border-radius: 18rpx;
   background: #fff;
@@ -256,6 +320,26 @@ onShow(load);
   gap: 20rpx;
   position: sticky;
   bottom: 18rpx;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14rpx;
+}
+
+.ghost {
+  height: 78rpx;
+  line-height: 78rpx;
+  border-radius: 16rpx;
+  color: #2a2118;
+  background: #faf5ee;
+  font-size: 27rpx;
+}
+
+.ghost.danger {
+  color: #9b3a20;
+  background: #fff1ea;
 }
 
 .contact-label {

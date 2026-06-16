@@ -47,6 +47,14 @@
 				"navigationBarBackgroundColor": "#FFF6EA",
 				"navigationBarTextStyle": "black"
 			}
+		},
+		{
+			"path": "pages/favorites/favorites",
+			"style": {
+				"navigationBarTitleText": "我的收藏",
+				"navigationBarBackgroundColor": "#FFF6EA",
+				"navigationBarTextStyle": "black"
+			}
 		}
 	],
 	"globalStyle": {
