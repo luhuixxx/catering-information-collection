@@ -51,7 +51,7 @@ class FoundationSmokeTests {
     }
 
     @Test
-    void shouldAllowAnonymousAiSearchWithDegradedFallback() {
+    void shouldAllowAnonymousAiSearch() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         String body = "{\"query\":\"杭州大厨 8000 以上\",\"page\":1,\"size\":5}";
@@ -61,7 +61,7 @@ class FoundationSmokeTests {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).contains("\"code\":0");
-        assertThat(response.getBody()).contains("\"degraded\":true");
+        assertThat(response.getBody()).contains("\"cityId\":330100");
     }
 
     @Test

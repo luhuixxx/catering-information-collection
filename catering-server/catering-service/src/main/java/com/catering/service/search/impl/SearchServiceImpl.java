@@ -93,8 +93,8 @@ public class SearchServiceImpl implements SearchService {
 
     private PostSearchQuery toPostSearchQuery(String rawQuery, AiSearchRequest request, PostSearchFilter filter, int page, int size) {
         PostSearchFilter safe = filter == null ? new PostSearchFilter() : filter;
-        Long cityId = firstNonNull(safe.getCityId(), request.getCityId(), resolveRegionId(safe.getCityName(), 2));
-        Long districtId = firstNonNull(safe.getDistrictId(), request.getDistrictId(), resolveRegionId(safe.getDistrictName(), 3));
+        Long cityId = firstNonNull(safe.getCityId(), resolveRegionId(safe.getCityName(), 2), request.getCityId());
+        Long districtId = firstNonNull(safe.getDistrictId(), resolveRegionId(safe.getDistrictName(), 3), request.getDistrictId());
         String keyword = firstText(safe.getKeyword(), hasStructuredFilters(safe) ? null : rawQuery);
         return PostSearchQuery.builder()
                 .keyword(keyword)
@@ -121,10 +121,12 @@ public class SearchServiceImpl implements SearchService {
     }
 
     private AiSearchResponse degradedSearch(String rawQuery, AiSearchRequest request, int page, int size, String reply, Double confidence) {
+        Long cityId = resolveRegionId(extractRegionHint(rawQuery, 2), 2);
+        Long districtId = resolveRegionId(extractRegionHint(rawQuery, 3), 3);
         PostSearchQuery query = PostSearchQuery.builder()
                 .keyword(rawQuery)
-                .cityId(request.getCityId())
-                .districtId(request.getDistrictId())
+                .cityId(cityId != null ? cityId : request.getCityId())
+                .districtId(districtId != null ? districtId : request.getDistrictId())
                 .sort("DEFAULT")
                 .page(page)
                 .size(size)
@@ -146,6 +148,24 @@ public class SearchServiceImpl implements SearchService {
             return List.of();
         }
         return list.getRecords().stream().limit(5).toList();
+    }
+
+    private String extractRegionHint(String query, int level) {
+        String normalized = normalizeText(query);
+        if (isBlank(normalized)) {
+            return null;
+        }
+        List<String> candidates = regionNames(level);
+        for (String candidate : candidates) {
+            if (normalized.contains(candidate)) {
+                return candidate;
+            }
+            String trimmed = candidate.replace("市", "").replace("区", "").replace("县", "");
+            if (!trimmed.isBlank() && normalized.contains(trimmed)) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     private List<String> regionNames(int level) {

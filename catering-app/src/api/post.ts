@@ -53,6 +53,8 @@ export interface AiSearchResponse {
   confidence?: number;
   parsedFilters: Record<string, unknown>;
   list: PublicPostPage;
+  cards?: PublicPostItem[];
+  messageType?: string;
 }
 
 export interface PublicPostDetail extends PublicPostItem {
@@ -136,7 +138,14 @@ export function fetchPublicPosts(params: Record<string, string | number | boolea
   return request<PublicPostPage>({ url: `/app/post-browse${query ? `?${query}` : ""}`, method: "GET" });
 }
 
-export function aiSearch(payload: { query: string; cityId?: number; districtId?: number; page?: number; size?: number }) {
+export function aiSearch(payload: {
+  query: string;
+  cityId?: number;
+  districtId?: number;
+  page?: number;
+  size?: number;
+  messages?: { role: string; content: string }[];
+}) {
   return request<AiSearchResponse>({ url: "/app/search/ai", method: "POST", data: payload });
 }
 

@@ -11,6 +11,19 @@
         <button v-for="item in examples" :key="item" class="example" @click="sendExample(item)">{{ item }}</button>
       </view>
 
+      <view class="history-panel" v-if="messages.length === 0 && history.length">
+        <view class="section-head">
+          <text class="section-title">最近搜索</text>
+          <button class="clear-history" @click="clearHistory">清空</button>
+        </view>
+        <view class="history-list">
+          <view v-for="item in history" :key="item" class="history-item">
+            <button class="history-query" @click="sendHistory(item)">{{ item }}</button>
+            <button class="history-delete" @click.stop="deleteHistory(item)">删除</button>
+          </view>
+        </view>
+      </view>
+
       <view v-for="message in messages" :key="message.id" :id="message.id" :class="['bubble-row', message.role]">
         <view :class="['bubble', message.role]">
           <text class="bubble-text">{{ message.content }}</text>
@@ -78,10 +91,17 @@ const cityId = ref<number | undefined>();
 const districtId = ref<number | undefined>();
 const loading = ref(false);
 const messages = ref<ChatMessage[]>([]);
+const history = ref<string[]>([]);
 const bottomAnchor = ref("bottom");
 const examples = ["杭州大厨 8000 以上", "可明火铺面", "宁波火锅服务员", "餐饮店转让"];
+const historyKey = "search_history";
 
 function sendExample(value: string) {
+  query.value = value;
+  sendMessage();
+}
+
+function sendHistory(value: string) {
   query.value = value;
   sendMessage();
 }
@@ -204,12 +224,27 @@ function scrollToBottom() {
 }
 
 function saveHistory(text: string) {
-  const key = "search_history";
-  const current = (uni.getStorageSync(key) || []) as string[];
-  uni.setStorageSync(key, [text, ...current.filter((item) => item !== text)].slice(0, 10));
+  history.value = [text, ...history.value.filter((item) => item !== text)].slice(0, 10);
+  uni.setStorageSync(historyKey, history.value);
+}
+
+function loadHistory() {
+  const stored = uni.getStorageSync(historyKey);
+  history.value = Array.isArray(stored) ? stored.filter((item) => typeof item === "string" && item.trim()).slice(0, 10) : [];
+}
+
+function deleteHistory(text: string) {
+  history.value = history.value.filter((item) => item !== text);
+  uni.setStorageSync(historyKey, history.value);
+}
+
+function clearHistory() {
+  history.value = [];
+  uni.removeStorageSync(historyKey);
 }
 
 onLoad((params) => {
+  loadHistory();
   if (typeof params?.query === "string") query.value = decodeURIComponent(params.query);
   if (typeof params?.cityId === "string") cityId.value = Number(params.cityId);
   if (typeof params?.districtId === "string") districtId.value = Number(params.districtId);
@@ -260,6 +295,76 @@ onLoad((params) => {
   display: flex;
   flex-wrap: wrap;
   gap: 10rpx;
+}
+
+.history-panel {
+  margin-top: 20rpx;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.section-title {
+  color: #66594d;
+  font-size: 25rpx;
+  font-weight: 700;
+}
+
+.clear-history {
+  height: 52rpx;
+  line-height: 52rpx;
+  margin: 0;
+  padding: 0 18rpx;
+  border-radius: 12rpx;
+  background: #fff;
+  color: #8f8578;
+  font-size: 23rpx;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.history-query {
+  flex: 1;
+  min-width: 0;
+  height: 68rpx;
+  line-height: 68rpx;
+  margin: 0;
+  padding: 0 18rpx;
+  border-radius: 12rpx;
+  background: #fff;
+  color: #2a2118;
+  font-size: 25rpx;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-delete {
+  flex-shrink: 0;
+  width: 92rpx;
+  height: 68rpx;
+  line-height: 68rpx;
+  margin: 0;
+  padding: 0;
+  border-radius: 12rpx;
+  background: #f1e7da;
+  color: #7a4a25;
+  font-size: 23rpx;
 }
 
 .example,
