@@ -33,10 +33,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements PostService {
+
+    private static final Pattern PHONE_PATTERN = Pattern.compile("^1\\d{10}$");
+    private static final int MIN_TITLE_LENGTH = 5;
+    private static final int MAX_TITLE_LENGTH = 30;
 
     private final PostMapper postMapper;
     private final PostRecruitMapper postRecruitMapper;
@@ -48,6 +53,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     @Override
     @Transactional
     public Long saveRecruitDraft(Long userId, RecruitPostUpsertRequest request) {
+        validateRecruitRequest(request);
         Post post = buildBasePost(userId, PostType.RECRUIT, request.getTitle(), request.getCityId(), request.getDistrictId(),
                 request.getAddress(), request.getContactName(), request.getContactPhone(), request.getContactWechat(),
                 request.getDescription(), request.getImages(), request.getExpireDays());
@@ -59,7 +65,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         recruit.setJobRole(request.getJobRole());
         recruit.setJobRoleOther(nvl(request.getJobRoleOther()));
         recruit.setShopCategory(nvl(request.getShopCategory()));
-        recruit.setSalaryType(SalaryType.valueOf(request.getSalaryType()));
+        recruit.setSalaryType(parseSalaryType(request.getSalaryType()));
         recruit.setSalaryMin(request.getSalaryMin());
         recruit.setSalaryMax(request.getSalaryMax());
         recruit.setProvideBoard(defaultInt(request.getProvideBoard(), 0));
@@ -76,6 +82,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     @Override
     @Transactional
     public Long saveTransferDraft(Long userId, TransferPostUpsertRequest request) {
+        validateTransferRequest(request);
         Post post = buildBasePost(userId, PostType.TRANSFER, request.getTitle(), request.getCityId(), request.getDistrictId(),
                 request.getAddress(), request.getContactName(), request.getContactPhone(), request.getContactWechat(),
                 request.getDescription(), request.getImages(), request.getExpireDays());
@@ -130,6 +137,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
                 .status(p.getStatus().name())
                 .title(p.getTitle())
                 .coverImage(p.getCoverImage())
+                .latestRejectReason(latestRejectReason(p.getId(), p.getStatus()))
                 .createdAt(p.getCreatedAt())
                 .expireAt(p.getExpireAt())
                 .build()).toList();
@@ -157,6 +165,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     @Override
     @Transactional
     public void updateRecruitDraft(Long userId, Long postId, RecruitPostUpsertRequest request) {
+        validateRecruitRequest(request);
         Post post = requireOwnedEditablePost(userId, postId, PostType.RECRUIT);
         applyBasePostUpdate(post, request.getTitle(), request.getCityId(), request.getDistrictId(), request.getAddress(),
                 request.getContactName(), request.getContactPhone(), request.getContactWechat(), request.getDescription(),
@@ -172,7 +181,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         recruit.setJobRole(request.getJobRole());
         recruit.setJobRoleOther(nvl(request.getJobRoleOther()));
         recruit.setShopCategory(nvl(request.getShopCategory()));
-        recruit.setSalaryType(SalaryType.valueOf(request.getSalaryType()));
+        recruit.setSalaryType(parseSalaryType(request.getSalaryType()));
         recruit.setSalaryMin(request.getSalaryMin());
         recruit.setSalaryMax(request.getSalaryMax());
         recruit.setProvideBoard(defaultInt(request.getProvideBoard(), 0));
@@ -188,6 +197,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     @Override
     @Transactional
     public void updateTransferDraft(Long userId, Long postId, TransferPostUpsertRequest request) {
+        validateTransferRequest(request);
         Post post = requireOwnedEditablePost(userId, postId, PostType.TRANSFER);
         applyBasePostUpdate(post, request.getTitle(), request.getCityId(), request.getDistrictId(), request.getAddress(),
                 request.getContactName(), request.getContactPhone(), request.getContactWechat(), request.getDescription(),
@@ -247,6 +257,10 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         result.put("images", postImageMapper.selectList(new LambdaQueryWrapper<PostImage>()
                 .eq(PostImage::getPostId, postId)
                 .orderByAsc(PostImage::getSortNo)));
+        result.put("auditHistory", postAuditRecordMapper.selectList(new LambdaQueryWrapper<PostAuditRecord>()
+                .eq(PostAuditRecord::getPostId, postId)
+                .orderByDesc(PostAuditRecord::getCreatedAt)));
+        result.put("publisherRejectedCount", countPublisherRejectedPosts(post.getPublisherUserId(), postId));
         if (post.getPostType() == PostType.RECRUIT) {
             result.put("ext", postRecruitMapper.selectById(postId));
         } else if (post.getPostType() == PostType.TRANSFER) {
@@ -271,6 +285,9 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         if ("APPROVE".equals(action)) {
             targetStatus = PostStatus.APPROVED;
         } else if ("REJECT".equals(action)) {
+            if (request.getReasonCode() == null || request.getReasonCode().isBlank()) {
+                throw new BusinessException(400, "请选择驳回原因");
+            }
             targetStatus = PostStatus.REJECTED;
         } else {
             throw new BusinessException(400, "不支持的审核动作");
@@ -290,6 +307,110 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         record.setOperatorAdminId(adminUserId);
         postAuditRecordMapper.insert(record);
         return record;
+    }
+
+    private long countPublisherRejectedPosts(Long publisherUserId, Long currentPostId) {
+        if (publisherUserId == null) {
+            return 0;
+        }
+        return postMapper.selectCount(new LambdaQueryWrapper<Post>()
+                .eq(Post::getPublisherUserId, publisherUserId)
+                .eq(Post::getStatus, PostStatus.REJECTED)
+                .ne(Post::getId, currentPostId));
+    }
+
+    private String latestRejectReason(Long postId, PostStatus status) {
+        if (status != PostStatus.REJECTED) {
+            return "";
+        }
+        PostAuditRecord record = postAuditRecordMapper.selectOne(new LambdaQueryWrapper<PostAuditRecord>()
+                .eq(PostAuditRecord::getPostId, postId)
+                .eq(PostAuditRecord::getAction, "REJECT")
+                .orderByDesc(PostAuditRecord::getCreatedAt)
+                .last("LIMIT 1"));
+        if (record == null) {
+            return "";
+        }
+        return record.getReasonText() == null || record.getReasonText().isBlank()
+                ? record.getReasonCode()
+                : record.getReasonText();
+    }
+
+    private void validateRecruitRequest(RecruitPostUpsertRequest request) {
+        validateBaseRequest(request.getTitle(), request.getContactName(), request.getContactPhone(),
+                request.getExpireDays(), request.getImages());
+        if (request.getJobRole() == null || request.getJobRole().isBlank()) {
+            throw new BusinessException(400, "岗位不能为空");
+        }
+        if ("OTHER".equalsIgnoreCase(request.getJobRole())
+                && (request.getJobRoleOther() == null || request.getJobRoleOther().isBlank())) {
+            throw new BusinessException(400, "选择其他岗位时请填写岗位名称");
+        }
+        SalaryType salaryType = parseSalaryType(request.getSalaryType());
+        if (salaryType == SalaryType.MONTHLY) {
+            if (request.getSalaryMin() == null || request.getSalaryMin() <= 0) {
+                throw new BusinessException(400, "固定月薪请填写薪资下限");
+            }
+            if (request.getSalaryMax() != null && request.getSalaryMax() < request.getSalaryMin()) {
+                throw new BusinessException(400, "薪资上限不能低于薪资下限");
+            }
+        }
+        if (request.getHeadcount() != null && (request.getHeadcount() < 1 || request.getHeadcount() > 99)) {
+            throw new BusinessException(400, "招聘人数需在 1-99 之间");
+        }
+    }
+
+    private void validateTransferRequest(TransferPostUpsertRequest request) {
+        validateBaseRequest(request.getTitle(), request.getContactName(), request.getContactPhone(),
+                request.getExpireDays(), request.getImages());
+        if (request.getShopCategory() == null || request.getShopCategory().isBlank()) {
+            throw new BusinessException(400, "经营类型不能为空");
+        }
+        if (request.getAreaSqm() == null || request.getAreaSqm() <= 0) {
+            throw new BusinessException(400, "面积必须大于 0");
+        }
+        if (defaultInt(request.getRentNegotiable(), 0) == 0
+                && (request.getRentMonthly() == null || request.getRentMonthly() <= 0)) {
+            throw new BusinessException(400, "请填写月租金，或选择月租面议");
+        }
+        if (defaultInt(request.getFeeNegotiable(), 0) == 0
+                && (request.getTransferFee() == null || request.getTransferFee() < 0)) {
+            throw new BusinessException(400, "请填写转让费，或选择转让费面议");
+        }
+        if (request.getIncludeEquipment() == null) {
+            throw new BusinessException(400, "请选择是否带设备");
+        }
+        if (request.getOperating() == null) {
+            throw new BusinessException(400, "请选择是否营业中");
+        }
+    }
+
+    private void validateBaseRequest(String title, String contactName, String contactPhone,
+                                     Integer expireDays, List<String> images) {
+        int titleLength = title == null ? 0 : title.trim().length();
+        if (titleLength < MIN_TITLE_LENGTH || titleLength > MAX_TITLE_LENGTH) {
+            throw new BusinessException(400, "标题需为 5-30 个字");
+        }
+        if (contactName == null || contactName.trim().length() < 2 || contactName.trim().length() > 20) {
+            throw new BusinessException(400, "联系人需为 2-20 个字");
+        }
+        if (contactPhone == null || !PHONE_PATTERN.matcher(contactPhone).matches()) {
+            throw new BusinessException(400, "请输入 11 位手机号");
+        }
+        if (expireDays != null && expireDays != 7 && expireDays != 15 && expireDays != 30) {
+            throw new BusinessException(400, "有效期只能选择 7/15/30 天");
+        }
+        if (images != null && images.size() > 9) {
+            throw new BusinessException(400, "图片最多上传 9 张");
+        }
+    }
+
+    private SalaryType parseSalaryType(String raw) {
+        try {
+            return SalaryType.valueOf(raw == null ? "" : raw.toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException(400, "薪资类型不正确");
+        }
     }
 
     private Post buildBasePost(Long userId, PostType postType, String title, Long cityId, Long districtId, String address,
@@ -377,4 +498,3 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         return value == null ? "" : value;
     }
 }
-

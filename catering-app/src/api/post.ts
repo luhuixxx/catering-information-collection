@@ -7,6 +7,7 @@ export interface MyPostItem {
   status: string;
   title: string;
   coverImage: string;
+  latestRejectReason: string;
   createdAt: string;
   expireAt: string;
 }
@@ -58,13 +59,44 @@ export function fetchUploadToken(fileName: string, contentType: string) {
 }
 
 export async function uploadImageToMinio(filePath: string): Promise<string> {
-  return await new Promise<string>((resolve, reject) => {
-    uni.uploadFile({
-      url: "/api/common/upload",
+  const token = await fetchUploadToken(filePath.split("/").pop() || "image.jpg", "image/jpeg");
+  try {
+    return await uploadFileWithOptions({
+      url: token.data.uploadUrl,
       filePath,
+      formData: token.data.formData,
+      resolveUrl: token.data.objectUrl,
+    });
+  } catch {
+    return uploadViaBackend(filePath);
+  }
+}
+
+function uploadViaBackend(filePath: string): Promise<string> {
+  return uploadFileWithOptions({
+    url: "/api/common/upload",
+    filePath,
+  });
+}
+
+function uploadFileWithOptions(options: {
+  url: string;
+  filePath: string;
+  formData?: Record<string, string>;
+  resolveUrl?: string;
+}): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    uni.uploadFile({
+      url: options.url,
+      filePath: options.filePath,
       name: "file",
+      formData: options.formData,
       success: (res) => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
+          if (options.resolveUrl) {
+            resolve(options.resolveUrl);
+            return;
+          }
           try {
             const body = JSON.parse(res.data as unknown as string) as {
               code: number;
@@ -87,4 +119,3 @@ export async function uploadImageToMinio(filePath: string): Promise<string> {
     });
   });
 }
-

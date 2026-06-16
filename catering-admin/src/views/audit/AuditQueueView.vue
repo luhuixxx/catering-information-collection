@@ -42,16 +42,55 @@
             <span>联系人</span><b>{{ detailPost.contactName }}</b>
             <span>电话</span><b>{{ detailPost.contactPhone }}</b>
             <span>地区</span><b>{{ detailPost.cityId }} / {{ detailPost.districtId }}</b>
+            <span>历史驳回</span><b>{{ publisherRejectedCount }} 次</b>
           </div>
           <p class="desc">{{ detailPost.description || '无补充说明' }}</p>
           <div v-if="detailImages.length" class="imgs">
             <img v-for="(img, i) in detailImages" :key="img + i" :src="img" class="img" />
           </div>
-          <pre class="json">{{ detailJson }}</pre>
+          <div class="ext-box">
+            <h3>业务字段</h3>
+            <pre class="json">{{ detailJson }}</pre>
+          </div>
+          <div class="history">
+            <h3>审核记录</h3>
+            <div v-if="auditHistory.length === 0" class="history-empty">暂无历史记录</div>
+            <div v-for="item in auditHistory" :key="item.id || item.createdAt" class="history-item">
+              <b>{{ item.action }}</b>
+              <span>{{ item.reasonText || item.reasonCode || '无说明' }}</span>
+              <em>{{ item.createdAt }}</em>
+            </div>
+          </div>
         </template>
       </div>
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="rejectVisible" title="驳回信息" width="520px" destroy-on-close>
+      <el-form label-position="top">
+        <el-form-item label="驳回原因">
+          <el-radio-group v-model="rejectForm.reasonCode">
+            <el-radio-button v-for="item in rejectReasons" :key="item.value" :label="item.value">
+              {{ item.label }}
+            </el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="补充说明">
+          <el-input
+            v-model="rejectForm.reasonText"
+            type="textarea"
+            :rows="4"
+            maxlength="120"
+            show-word-limit
+            placeholder="请写清楚发布者需要修改什么，例如：请补充真实店面图片，联系电话无法接通。"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="rejectVisible = false">取消</el-button>
+        <el-button type="danger" :loading="rejecting" @click="confirmReject">确定驳回</el-button>
       </template>
     </el-dialog>
   </div>
@@ -59,7 +98,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { auditPost, fetchPendingPostDetail, fetchPendingPosts, type PendingPost } from '@/api/post'
 
 const loading = ref(false)
@@ -75,6 +114,24 @@ const detailImages = computed(() => {
   const arr = (detail.value?.images || []) as Array<{ url?: string }>
   return arr.map((i) => i.url || '').filter(Boolean)
 })
+const publisherRejectedCount = computed(() => Number(detail.value?.publisherRejectedCount || 0))
+const auditHistory = computed(() => (detail.value?.auditHistory || []) as Array<Record<string, any>>)
+const rejectVisible = ref(false)
+const rejecting = ref(false)
+const rejectPostId = ref('')
+const rejectForm = ref({
+  reasonCode: '',
+  reasonText: '',
+})
+
+const rejectReasons = [
+  { label: '信息不实', value: 'INVALID_INFO' },
+  { label: '联系方式无效', value: 'INVALID_CONTACT' },
+  { label: '内容违规', value: 'VIOLATION' },
+  { label: '图片不合规', value: 'BAD_IMAGE' },
+  { label: '重复信息', value: 'DUPLICATE' },
+  { label: '其他', value: 'OTHER' },
+]
 
 async function load() {
   loading.value = true
@@ -113,19 +170,30 @@ async function approve(postId: string) {
 }
 
 async function reject(postId: string) {
+  rejectPostId.value = postId
+  rejectForm.value = { reasonCode: '', reasonText: '' }
+  rejectVisible.value = true
+}
+
+async function confirmReject() {
+  if (!rejectForm.value.reasonCode) {
+    ElMessage.warning('请选择驳回原因')
+    return
+  }
+  if (!rejectForm.value.reasonText.trim()) {
+    ElMessage.warning('请填写补充说明')
+    return
+  }
+  rejecting.value = true
   try {
-    const { value } = await ElMessageBox.prompt('请输入驳回原因（可空）', '驳回', {
-      confirmButtonText: '确定驳回',
-      cancelButtonText: '取消',
-      inputPlaceholder: '如：图片不清晰/联系方式不规范/标题过短等',
-    })
-    await auditPost(postId, 'REJECT', value)
+    await auditPost(rejectPostId.value, 'REJECT', rejectForm.value.reasonCode, rejectForm.value.reasonText.trim())
     ElMessage.success('已驳回')
+    rejectVisible.value = false
     await load()
   } catch (e) {
-    if (e !== 'cancel') {
-      ElMessage.error(e instanceof Error ? e.message : '操作失败')
-    }
+    ElMessage.error(e instanceof Error ? e.message : '操作失败')
+  } finally {
+    rejecting.value = false
   }
 }
 
@@ -182,7 +250,7 @@ load()
   border-radius: 10px;
   background: #13110f;
   color: #f6f0e8;
-  max-height: 56vh;
+  max-height: 32vh;
   overflow: auto;
 }
 
@@ -222,5 +290,68 @@ load()
   border-radius: 8px;
   border: 1px solid #eee2d4;
 }
-</style>
 
+.ext-box,
+.history {
+  margin-top: 14px;
+}
+
+.ext-box h3,
+.history h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #2a2118;
+}
+
+.history {
+  padding: 12px;
+  border-radius: 10px;
+  background: #fbf6ef;
+  border: 1px solid #eee2d4;
+}
+
+.history-empty {
+  color: #9a8f82;
+  font-size: 13px;
+}
+
+.history-item {
+  display: grid;
+  grid-template-columns: 90px 1fr 170px;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid #eee2d4;
+}
+
+.history-item:first-of-type {
+  border-top: 0;
+}
+
+.history-item b {
+  color: #a85a24;
+  font-size: 12px;
+}
+
+.history-item span {
+  color: #51463a;
+  font-size: 13px;
+}
+
+.history-item em {
+  color: #9a8f82;
+  font-size: 12px;
+  font-style: normal;
+}
+
+:deep(.el-radio-group) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+:deep(.el-radio-button__inner) {
+  border-left: var(--el-border);
+  border-radius: 8px !important;
+}
+</style>

@@ -20,10 +20,10 @@ export function fetchPendingPostDetail(postId: string) {
   return request.get<ApiResult<Record<string, unknown>>>(`/admin/posts/${postId}/detail`)
 }
 
-export function auditPost(postId: string, action: 'APPROVE' | 'REJECT', reasonText?: string) {
+export function auditPost(postId: string, action: 'APPROVE' | 'REJECT', reasonCode?: string, reasonText?: string) {
   return request.post<ApiResult<Record<string, unknown>>>(`/admin/posts/${postId}/audit`, {
     action,
-    reasonCode: action,
+    reasonCode: reasonCode || '',
     reasonText: reasonText || '',
   })
 }

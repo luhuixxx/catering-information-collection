@@ -14,6 +14,7 @@ public class MyPostVO {
     private String status;
     private String title;
     private String coverImage;
+    private String latestRejectReason;
     private LocalDateTime createdAt;
     private LocalDateTime expireAt;
 }

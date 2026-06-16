@@ -28,9 +28,13 @@
           <text class="status" :class="`s-${post.status}`">{{ statusLabel(post.status) }}</text>
         </view>
         <text class="title-line">{{ post.title }}</text>
+        <text v-if="post.latestRejectReason" class="reject-reason">驳回原因：{{ post.latestRejectReason }}</text>
         <view class="meta">
           <text>编号：{{ post.postNo }}</text>
           <text>创建：{{ formatTime(post.createdAt) }}</text>
+        </view>
+        <view class="action-line">
+          <text>{{ post.status === 'APPROVED' ? `有效期至：${formatTime(post.expireAt)}` : actionHint(post.status) }}</text>
         </view>
       </view>
     </view>
@@ -69,6 +73,17 @@ function statusLabel(v: string) {
 
 function formatTime(v: string) {
   return v ? v.replace("T", " ").slice(0, 16) : "-";
+}
+
+function actionHint(v: string) {
+  const map: Record<string, string> = {
+    DRAFT: "点击继续编辑并提交",
+    PENDING: "运营审核中，请耐心等待",
+    REJECTED: "点击修改后可重新提交",
+    EXPIRED: "已过期，后续阶段支持重新发布",
+    OFFLINE: "已下架",
+  };
+  return map[v] || "点击查看";
 }
 
 async function load() {
@@ -195,6 +210,22 @@ onShow(load);
   font-size: 22rpx;
 }
 
+.reject-reason {
+  display: block;
+  margin-top: 10rpx;
+  padding: 12rpx 14rpx;
+  border-radius: 12rpx;
+  color: #9b312b;
+  background: #fff0ee;
+  font-size: 24rpx;
+}
+
+.action-line {
+  margin-top: 12rpx;
+  color: #7a6f63;
+  font-size: 23rpx;
+}
+
 .loading,
 .empty {
   padding: 26rpx;
@@ -203,4 +234,3 @@ onShow(load);
   font-size: 24rpx;
 }
 </style>
-

@@ -61,13 +61,41 @@
       <view v-if="type === 'RECRUIT'" class="block">
         <view class="field">
           <text class="label">岗位</text>
-          <input v-model="recruit.jobRole" class="input" placeholder="如：厨师/切配/收银" />
+          <input v-model="recruit.jobRole" class="input" placeholder="如：厨师/服务员/收银员/OTHER" />
+        </view>
+        <view v-if="recruit.jobRole.toUpperCase() === 'OTHER'" class="field">
+          <text class="label">其他岗位名称</text>
+          <input v-model="recruit.jobRoleOther" class="input" placeholder="请填写具体岗位" />
+        </view>
+        <view class="field">
+          <text class="label">门店类型</text>
+          <input v-model="recruit.shopCategory" class="input" placeholder="如：中餐/火锅/快餐/茶饮" />
         </view>
         <view class="field">
           <text class="label">薪资类型</text>
           <picker :range="salaryTypes" @change="onSalaryChange">
-            <view class="picker">{{ recruit.salaryType }}</view>
+            <view class="picker">{{ salaryLabel(recruit.salaryType) }}</view>
           </picker>
+        </view>
+        <view v-if="recruit.salaryType === 'MONTHLY'" class="two-cols">
+          <view class="field">
+            <text class="label">薪资下限</text>
+            <input v-model.number="recruit.salaryMin" class="input" type="number" placeholder="例如 7000" />
+          </view>
+          <view class="field">
+            <text class="label">薪资上限</text>
+            <input v-model.number="recruit.salaryMax" class="input" type="number" placeholder="可选" />
+          </view>
+        </view>
+        <view class="two-cols">
+          <view class="field">
+            <text class="label">包吃住</text>
+            <switch :checked="recruit.provideBoard === 1" color="#c87941" @change="recruit.provideBoard = $event.detail.value ? 1 : 0" />
+          </view>
+          <view class="field">
+            <text class="label">招聘人数</text>
+            <input v-model.number="recruit.headcount" class="input" type="number" placeholder="1" />
+          </view>
         </view>
       </view>
 
@@ -79,6 +107,36 @@
         <view class="field">
           <text class="label">面积（㎡）</text>
           <input v-model.number="transfer.areaSqm" class="input" type="number" placeholder="例如 60" />
+        </view>
+        <view class="two-cols">
+          <view class="field">
+            <text class="label">月租金</text>
+            <input v-model.number="transfer.rentMonthly" class="input" type="number" placeholder="例如 8000" />
+          </view>
+          <view class="field compact">
+            <text class="label">月租面议</text>
+            <switch :checked="transfer.rentNegotiable === 1" color="#c87941" @change="transfer.rentNegotiable = $event.detail.value ? 1 : 0" />
+          </view>
+        </view>
+        <view class="two-cols">
+          <view class="field">
+            <text class="label">转让费</text>
+            <input v-model.number="transfer.transferFee" class="input" type="number" placeholder="例如 150000" />
+          </view>
+          <view class="field compact">
+            <text class="label">转让费面议</text>
+            <switch :checked="transfer.feeNegotiable === 1" color="#c87941" @change="transfer.feeNegotiable = $event.detail.value ? 1 : 0" />
+          </view>
+        </view>
+        <view class="two-cols">
+          <view class="field compact">
+            <text class="label">带设备</text>
+            <switch :checked="transfer.includeEquipment === 1" color="#c87941" @change="transfer.includeEquipment = $event.detail.value ? 1 : 0" />
+          </view>
+          <view class="field compact">
+            <text class="label">营业中</text>
+            <switch :checked="transfer.operating === 1" color="#c87941" @change="transfer.operating = $event.detail.value ? 1 : 0" />
+          </view>
         </view>
       </view>
 
@@ -124,12 +182,24 @@ const form = ref({
 
 const recruit = ref({
   jobRole: "",
+  jobRoleOther: "",
+  shopCategory: "",
   salaryType: "MONTHLY",
+  salaryMin: undefined as number | undefined,
+  salaryMax: undefined as number | undefined,
+  provideBoard: 0,
+  headcount: 1,
 });
 
 const transfer = ref({
   shopCategory: "",
   areaSqm: 60,
+  rentMonthly: undefined as number | undefined,
+  rentNegotiable: 0,
+  transferFee: undefined as number | undefined,
+  feeNegotiable: 0,
+  includeEquipment: 1,
+  operating: 1,
 });
 
 const saving = ref(false);
@@ -146,14 +216,52 @@ function onSalaryChange(e: any) {
   recruit.value.salaryType = salaryTypes[e.detail.value] || "MONTHLY";
 }
 
+function salaryLabel(value: string) {
+  return value === "NEGOTIABLE" ? "面议" : "固定月薪";
+}
+
+function validateForm() {
+  if (!region.value.cityId || !region.value.districtId) return "请选择地区";
+  const title = form.value.title.trim();
+  if (title.length < 5 || title.length > 30) return "标题需为 5-30 个字";
+  if (form.value.contactName.trim().length < 2) return "请填写至少 2 个字的联系人";
+  if (!/^1\d{10}$/.test(form.value.contactPhone)) return "请输入 11 位手机号";
+  if (images.value.length > 9) return "图片最多上传 9 张";
+  if (type.value === "RECRUIT") {
+    if (!recruit.value.jobRole.trim()) return "请填写岗位";
+    if (recruit.value.jobRole.toUpperCase() === "OTHER" && !recruit.value.jobRoleOther.trim()) {
+      return "选择其他岗位时请填写岗位名称";
+    }
+    if (recruit.value.salaryType === "MONTHLY") {
+      if (!recruit.value.salaryMin || recruit.value.salaryMin <= 0) return "固定月薪请填写薪资下限";
+      if (recruit.value.salaryMax && recruit.value.salaryMax < recruit.value.salaryMin) return "薪资上限不能低于下限";
+    }
+    if (!recruit.value.headcount || recruit.value.headcount < 1 || recruit.value.headcount > 99) {
+      return "招聘人数需在 1-99 之间";
+    }
+  } else {
+    if (!transfer.value.shopCategory.trim()) return "请填写经营类型";
+    if (!transfer.value.areaSqm || transfer.value.areaSqm <= 0) return "面积必须大于 0";
+    if (!transfer.value.rentNegotiable && (!transfer.value.rentMonthly || transfer.value.rentMonthly <= 0)) {
+      return "请填写月租金，或选择月租面议";
+    }
+    if (!transfer.value.feeNegotiable && (transfer.value.transferFee === undefined || transfer.value.transferFee < 0)) {
+      return "请填写转让费，或选择转让费面议";
+    }
+  }
+  return "";
+}
+
 async function saveDraft() {
   if (!isLoggedIn()) {
     uni.showToast({ title: "请先登录", icon: "none" });
     uni.navigateTo({ url: "/pages/login/login" });
     return;
   }
-  if (!region.value.cityId || !region.value.districtId) {
-    error.value = "请选择地区";
+  const validationError = validateForm();
+  if (validationError) {
+    error.value = validationError;
+    uni.showToast({ title: validationError, icon: "none" });
     return;
   }
   saving.value = true;
@@ -174,7 +282,13 @@ async function saveDraft() {
       const payload = {
         ...base,
         jobRole: recruit.value.jobRole,
+        jobRoleOther: recruit.value.jobRoleOther,
+        shopCategory: recruit.value.shopCategory,
         salaryType: recruit.value.salaryType,
+        salaryMin: recruit.value.salaryType === "MONTHLY" ? recruit.value.salaryMin : undefined,
+        salaryMax: recruit.value.salaryType === "MONTHLY" ? recruit.value.salaryMax : undefined,
+        provideBoard: recruit.value.provideBoard,
+        headcount: recruit.value.headcount,
       };
       if (isEditMode.value && lastPostId.value) {
         await updateRecruitDraft(lastPostId.value, payload);
@@ -187,6 +301,12 @@ async function saveDraft() {
         ...base,
         shopCategory: transfer.value.shopCategory,
         areaSqm: transfer.value.areaSqm,
+        rentMonthly: transfer.value.rentNegotiable ? undefined : transfer.value.rentMonthly,
+        rentNegotiable: transfer.value.rentNegotiable,
+        transferFee: transfer.value.feeNegotiable ? undefined : transfer.value.transferFee,
+        feeNegotiable: transfer.value.feeNegotiable,
+        includeEquipment: transfer.value.includeEquipment,
+        operating: transfer.value.operating,
       };
       if (isEditMode.value && lastPostId.value) {
         await updateTransferDraft(lastPostId.value, payload);
@@ -288,10 +408,22 @@ onLoad(async (query) => {
     images.value = imgList.map((i) => i.url || "").filter(Boolean);
     if (type.value === "RECRUIT") {
       recruit.value.jobRole = ext.jobRole || "";
+      recruit.value.jobRoleOther = ext.jobRoleOther || "";
+      recruit.value.shopCategory = ext.shopCategory || "";
       recruit.value.salaryType = ext.salaryType || "MONTHLY";
+      recruit.value.salaryMin = ext.salaryMin;
+      recruit.value.salaryMax = ext.salaryMax;
+      recruit.value.provideBoard = ext.provideBoard ?? 0;
+      recruit.value.headcount = ext.headcount ?? 1;
     } else {
       transfer.value.shopCategory = ext.shopCategory || "";
       transfer.value.areaSqm = ext.areaSqm || 60;
+      transfer.value.rentMonthly = ext.rentMonthly;
+      transfer.value.rentNegotiable = ext.rentNegotiable ?? 0;
+      transfer.value.transferFee = ext.transferFee;
+      transfer.value.feeNegotiable = ext.feeNegotiable ?? 0;
+      transfer.value.includeEquipment = ext.includeEquipment ?? 1;
+      transfer.value.operating = ext.operating ?? 1;
     }
   } catch (e) {
     uni.showToast({ title: e instanceof Error ? e.message : "加载编辑数据失败", icon: "none" });
@@ -369,6 +501,24 @@ onLoad(async (query) => {
 .field {
   margin-bottom: 22rpx;
 }
+
+.two-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16rpx;
+}
+
+.field.compact {
+  min-height: 116rpx;
+  padding: 10rpx 18rpx;
+  border-radius: 16rpx;
+  background: #faf5ee;
+}
+
+.field.compact .label {
+  margin-bottom: 12rpx;
+}
+
 .label {
   display: block;
   margin-bottom: 10rpx;
@@ -381,6 +531,7 @@ onLoad(async (query) => {
   border-radius: 16rpx;
   background: #faf5ee;
   font-size: 30rpx;
+  box-sizing: border-box;
 }
 .textarea {
   width: 100%;
@@ -477,4 +628,3 @@ onLoad(async (query) => {
   background: #f5ecdf;
 }
 </style>
-
