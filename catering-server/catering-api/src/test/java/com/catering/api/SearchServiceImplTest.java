@@ -20,6 +20,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -78,6 +79,39 @@ class SearchServiceImplTest {
         assertThat(response.isDegraded()).isTrue();
     }
 
+    @Test
+    void shouldRelaxSoftFiltersWhenPreciseSearchIsEmpty() {
+        AiFacade aiFacade = mock(AiFacade.class);
+        PostService postService = mock(PostService.class);
+        SysRegionMapper regionMapper = mock(SysRegionMapper.class);
+        SearchServiceImpl service = new SearchServiceImpl(aiFacade, postService, regionMapper);
+
+        SearchParseResponse parsed = new SearchParseResponse();
+        parsed.setIntent("search");
+        PostSearchFilter filter = new PostSearchFilter();
+        filter.setPostType("RECRUIT");
+        filter.setJobRole("服务员");
+        filter.setShopCategory("火锅");
+        parsed.setFilters(filter);
+        when(aiFacade.parseSearchQuery(any())).thenReturn(parsed);
+        when(postService.listPublicPosts(eq("RECRUIT"), any(), any(), any(), any(), any(), eq("服务员"), eq("火锅"), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(PostPageVO.<PostListItemVO>builder().page(1).size(8).total(0).records(List.of()).build());
+        when(postService.listPublicPosts(eq("RECRUIT"), any(), any(), any(), any(), any(), eq("服务员"), eq(null), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(PostPageVO.<PostListItemVO>builder().page(1).size(8).total(1).records(List.of(card("杭州西湖招聘服务员"))).build());
+
+        AiSearchRequest request = new AiSearchRequest();
+        request.setQuery("火锅服务员");
+        request.setPage(1);
+        request.setSize(8);
+
+        AiSearchResponse response = service.aiSearch(request);
+
+        assertThat(response.getCards()).hasSize(1);
+        assertThat(response.getParsedFilters().getJobRole()).isEqualTo("服务员");
+        assertThat(response.getParsedFilters().getShopCategory()).isNull();
+        assertThat(response.getReply()).contains("放宽");
+    }
+
     private SysRegion region(Long id, int level, String name) {
         SysRegion region = new SysRegion();
         region.setId(id);
@@ -85,5 +119,13 @@ class SearchServiceImplTest {
         region.setName(name);
         region.setEnabled(1);
         return region;
+    }
+
+    private PostListItemVO card(String title) {
+        return PostListItemVO.builder()
+                .id("1")
+                .postType("RECRUIT")
+                .title(title)
+                .build();
     }
 }

@@ -128,10 +128,11 @@ async function sendMessage() {
     });
     const cards = res.data.cards?.length ? res.data.cards : res.data.list.records.slice(0, 5);
     const fallbackText = cards.length ? `我找到了 ${res.data.list.total} 条相关信息，先给你看这几条。` : "暂时没找到匹配信息，可以换个说法或放宽地区/薪资。";
+    const replyText = cards.length ? res.data.reply || fallbackText : fallbackText;
     messages.value.push({
       id: nextId("assistant"),
       role: "assistant",
-      content: res.data.reply || fallbackText,
+      content: replyText,
       query: text,
       cards,
       filters: filterChips(res.data.parsedFilters || {}),

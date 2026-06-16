@@ -48,14 +48,15 @@ public class SearchServiceImpl implements SearchService {
             }
             PostSearchQuery query = toPostSearchQuery(rawQuery, request, parsed.getFilters(), page, size);
             PostPageVO<PostListItemVO> list = search(query);
+            SearchOutcome outcome = expandIfEmpty(query, list);
             return AiSearchResponse.builder()
-                    .reply(defaultReply(parsed.getReply(), query))
+                    .reply(replyForOutcome(parsed.getReply(), query, outcome))
                     .degraded(false)
                     .confidence(parsed.getConfidence())
-                    .parsedFilters(query)
-                    .list(list)
-                    .cards(topCards(list))
-                    .messageType(list.getRecords().isEmpty() ? "TEXT" : "CARDS")
+                    .parsedFilters(outcome.query())
+                    .list(outcome.list())
+                    .cards(topCards(outcome.list()))
+                    .messageType(outcome.list().getRecords().isEmpty() ? "TEXT" : "CARDS")
                     .build();
         } catch (AiDegradedException ex) {
             return degradedSearch(rawQuery, request, page, size, "AI 暂时不可用，已按关键词为你搜索。", null);
@@ -118,6 +119,59 @@ public class SearchServiceImpl implements SearchService {
                 query.getKeyword(), query.getMinSalary(), query.getMaxSalary(), query.getJobRole(),
                 query.getShopCategory(), query.getCanCatering(), query.getCanOpenFlame(),
                 query.getSort(), query.getPage(), query.getSize());
+    }
+
+    private SearchOutcome expandIfEmpty(PostSearchQuery query, PostPageVO<PostListItemVO> list) {
+        if (hasRecords(list)) {
+            return new SearchOutcome(query, list, false, null);
+        }
+        PostSearchQuery expanded = null;
+        String reason = null;
+        if (!isBlank(query.getJobRole()) && !isBlank(query.getShopCategory())) {
+            expanded = copyQuery(query).shopCategory(null).build();
+            reason = "没有完全匹配的结果，先保留岗位为你放宽了门店类型。";
+        } else if (shouldRelaxTypeFilters(query)) {
+            expanded = copyQuery(query).jobRole(null).shopCategory(null).canCatering(null).canOpenFlame(null).build();
+            reason = "没有完全匹配的结果，先保留地区和信息类型为你扩大范围。";
+        } else if (!isBlank(query.getKeyword()) && query.getPostType() != null) {
+            expanded = copyQuery(query).keyword(null).build();
+            reason = "没有完全匹配关键词的结果，先按信息类型为你扩大范围。";
+        }
+        if (expanded == null) {
+            return new SearchOutcome(query, list, false, null);
+        }
+        PostPageVO<PostListItemVO> expandedList = search(expanded);
+        return hasRecords(expandedList)
+                ? new SearchOutcome(expanded, expandedList, true, reason)
+                : new SearchOutcome(query, list, false, null);
+    }
+
+    private boolean shouldRelaxTypeFilters(PostSearchQuery query) {
+        return !isBlank(query.getJobRole())
+                || !isBlank(query.getShopCategory())
+                || query.getCanCatering() != null
+                || query.getCanOpenFlame() != null;
+    }
+
+    private boolean hasRecords(PostPageVO<PostListItemVO> list) {
+        return list != null && list.getRecords() != null && !list.getRecords().isEmpty();
+    }
+
+    private PostSearchQuery.PostSearchQueryBuilder copyQuery(PostSearchQuery query) {
+        return PostSearchQuery.builder()
+                .keyword(query.getKeyword())
+                .postType(query.getPostType())
+                .cityId(query.getCityId())
+                .districtId(query.getDistrictId())
+                .minSalary(query.getMinSalary())
+                .maxSalary(query.getMaxSalary())
+                .jobRole(query.getJobRole())
+                .shopCategory(query.getShopCategory())
+                .canCatering(query.getCanCatering())
+                .canOpenFlame(query.getCanOpenFlame())
+                .sort(query.getSort())
+                .page(query.getPage())
+                .size(query.getSize());
     }
 
     private AiSearchResponse degradedSearch(String rawQuery, AiSearchRequest request, int page, int size, String reply, Double confidence) {
@@ -220,6 +274,16 @@ public class SearchServiceImpl implements SearchService {
         return query.getPostType() == null ? "已按你的描述筛选信息。" : "已按你的描述筛选" + query.getPostType() + "信息。";
     }
 
+    private String replyForOutcome(String reply, PostSearchQuery query, SearchOutcome outcome) {
+        if (outcome.expanded()) {
+            return outcome.reason();
+        }
+        if (!hasRecords(outcome.list())) {
+            return "暂时没有找到完全匹配的信息，可以换个说法或放宽条件。";
+        }
+        return defaultReply(reply, query);
+    }
+
     private boolean hasStructuredFilters(PostSearchFilter filter) {
         return !isBlank(filter.getPostType())
                 || filter.getCityId() != null
@@ -263,5 +327,8 @@ public class SearchServiceImpl implements SearchService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private record SearchOutcome(PostSearchQuery query, PostPageVO<PostListItemVO> list, boolean expanded, String reason) {
     }
 }
