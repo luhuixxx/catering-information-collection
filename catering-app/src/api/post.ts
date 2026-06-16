@@ -22,6 +22,45 @@ export interface UploadTokenData {
   expireAt: number;
 }
 
+export interface PublicPostItem {
+  id: string;
+  postNo: string;
+  postType: string;
+  status: string;
+  title: string;
+  cityId: number;
+  cityName: string;
+  districtId: number;
+  districtName: string;
+  summary: string;
+  coverImage: string;
+  isTop: number;
+  createdAt: string;
+  expireAt: string;
+  highlights: Record<string, unknown>;
+}
+
+export interface PublicPostPage {
+  total: number;
+  page: number;
+  size: number;
+  records: PublicPostItem[];
+}
+
+export interface PublicPostDetail extends PublicPostItem {
+  status: string;
+  address: string;
+  contactName: string;
+  contactPhoneMasked: string;
+  contactPhone: string;
+  contactWechat: string;
+  phoneVisible: boolean;
+  phoneNotice: string;
+  description: string;
+  images: string[];
+  ext: Record<string, unknown>;
+}
+
 export function saveRecruitDraft(payload: Record<string, unknown>) {
   return request<{ postId: string }>({ url: "/app/posts/recruit/draft", method: "POST", data: payload });
 }
@@ -30,12 +69,36 @@ export function saveTransferDraft(payload: Record<string, unknown>) {
   return request<{ postId: string }>({ url: "/app/posts/transfer/draft", method: "POST", data: payload });
 }
 
+export function saveRentDraft(payload: Record<string, unknown>) {
+  return request<{ postId: string }>({ url: "/app/posts/rent/draft", method: "POST", data: payload });
+}
+
+export function saveJobSeekDraft(payload: Record<string, unknown>) {
+  return request<{ postId: string }>({ url: "/app/posts/job-seek/draft", method: "POST", data: payload });
+}
+
+export function saveFranchiseDraft(payload: Record<string, unknown>) {
+  return request<{ postId: string }>({ url: "/app/posts/franchise/draft", method: "POST", data: payload });
+}
+
 export function updateRecruitDraft(postId: string, payload: Record<string, unknown>) {
   return request<void>({ url: `/app/posts/${postId}/recruit`, method: "PUT", data: payload });
 }
 
 export function updateTransferDraft(postId: string, payload: Record<string, unknown>) {
   return request<void>({ url: `/app/posts/${postId}/transfer`, method: "PUT", data: payload });
+}
+
+export function updateRentDraft(postId: string, payload: Record<string, unknown>) {
+  return request<void>({ url: `/app/posts/${postId}/rent`, method: "PUT", data: payload });
+}
+
+export function updateJobSeekDraft(postId: string, payload: Record<string, unknown>) {
+  return request<void>({ url: `/app/posts/${postId}/job-seek`, method: "PUT", data: payload });
+}
+
+export function updateFranchiseDraft(postId: string, payload: Record<string, unknown>) {
+  return request<void>({ url: `/app/posts/${postId}/franchise`, method: "PUT", data: payload });
 }
 
 export function submitPost(postId: string) {
@@ -49,6 +112,18 @@ export function fetchMyPosts(status?: string) {
 
 export function fetchEditablePost(postId: string) {
   return request<Record<string, unknown>>({ url: `/app/posts/${postId}/edit`, method: "GET" });
+}
+
+export function fetchPublicPosts(params: Record<string, string | number | undefined>) {
+  const query = Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== "")
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+    .join("&");
+  return request<PublicPostPage>({ url: `/app/post-browse${query ? `?${query}` : ""}`, method: "GET" });
+}
+
+export function fetchPublicPostDetail(postId: string) {
+  return request<PublicPostDetail>({ url: `/app/post-browse/${postId}`, method: "GET" });
 }
 
 export function fetchUploadToken(fileName: string, contentType: string) {

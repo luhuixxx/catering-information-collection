@@ -28,6 +28,7 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
+import { onLoad } from "@dcloudio/uni-app";
 import { loginBySms, sendSmsCode } from "@/api/auth";
 import { setToken } from "@/api/request";
 
@@ -37,6 +38,7 @@ const loading = ref(false);
 const sending = ref(false);
 const countdown = ref(0);
 const error = ref("");
+const redirect = ref("");
 let timer: ReturnType<typeof setInterval> | null = null;
 
 function startCountdown() {
@@ -81,13 +83,23 @@ async function handleLogin() {
     uni.setStorageSync("user_phone", res.data.phone);
     uni.setStorageSync("user_nickname", res.data.nickname);
     uni.showToast({ title: "登录成功", icon: "success" });
-    setTimeout(() => uni.navigateBack(), 400);
+    setTimeout(() => {
+      if (redirect.value) {
+        uni.redirectTo({ url: redirect.value });
+      } else {
+        uni.navigateBack();
+      }
+    }, 400);
   } catch (e) {
     error.value = e instanceof Error ? e.message : "登录失败";
   } finally {
     loading.value = false;
   }
 }
+
+onLoad((query) => {
+  redirect.value = typeof query?.redirect === "string" ? decodeURIComponent(query.redirect) : "";
+});
 </script>
 
 <style scoped>

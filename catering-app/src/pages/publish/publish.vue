@@ -2,12 +2,13 @@
   <view class="page">
     <view class="hero">
       <text class="title">发布信息</text>
-      <text class="subtitle">阶段2：先支持 招聘 / 转让，提交后进入人工审核</text>
+      <text class="subtitle">填写清楚关键信息，提交后由运营审核上架</text>
     </view>
 
     <view class="tabs">
-      <view class="tab" :class="{ active: type === 'RECRUIT' }" @click="type = 'RECRUIT'">招聘</view>
-      <view class="tab" :class="{ active: type === 'TRANSFER' }" @click="type = 'TRANSFER'">转让</view>
+      <view v-for="item in typeOptions" :key="item.value" class="tab" :class="{ active: type === item.value }" @click="type = item.value">
+        {{ item.label }}
+      </view>
     </view>
 
     <RegionPicker v-model="region" />
@@ -44,7 +45,7 @@
       </view>
 
       <view class="field">
-        <text class="label">图片上传（直传 MinIO）</text>
+        <text class="label">图片上传</text>
         <view class="img-row">
           <button class="mini-btn" :disabled="uploading || images.length >= 9" @click="chooseAndUploadImage">
             {{ uploading ? "上传中..." : "选择图片" }}
@@ -99,7 +100,7 @@
         </view>
       </view>
 
-      <view v-else class="block">
+      <view v-else-if="type === 'TRANSFER'" class="block">
         <view class="field">
           <text class="label">经营类型</text>
           <input v-model="transfer.shopCategory" class="input" placeholder="如：快餐/烧烤/奶茶" />
@@ -140,6 +141,93 @@
         </view>
       </view>
 
+      <view v-else-if="type === 'RENT'" class="block">
+        <view class="field">
+          <text class="label">面积（㎡）</text>
+          <input v-model.number="rent.areaSqm" class="input" type="number" placeholder="例如 80" />
+        </view>
+        <view class="two-cols">
+          <view class="field">
+            <text class="label">月租金</text>
+            <input v-model.number="rent.rentMonthly" class="input" type="number" placeholder="例如 9000" />
+          </view>
+          <view class="field compact">
+            <text class="label">月租面议</text>
+            <switch :checked="rent.rentNegotiable === 1" color="#c87941" @change="rent.rentNegotiable = $event.detail.value ? 1 : 0" />
+          </view>
+        </view>
+        <view class="two-cols">
+          <view class="field compact">
+            <text class="label">可餐饮</text>
+            <switch :checked="rent.canCatering === 1" color="#c87941" @change="rent.canCatering = $event.detail.value ? 1 : 0" />
+          </view>
+          <view class="field compact">
+            <text class="label">可明火</text>
+            <switch :checked="rent.canOpenFlame === 1" color="#c87941" @change="rent.canOpenFlame = $event.detail.value ? 1 : 0" />
+          </view>
+        </view>
+        <view class="two-cols">
+          <view class="field">
+            <text class="label">入场费/转让费</text>
+            <input v-model.number="rent.entryFee" class="input" type="number" placeholder="可选" />
+          </view>
+          <view class="field">
+            <text class="label">楼层</text>
+            <input v-model="rent.floorDesc" class="input" placeholder="如：1层临街" />
+          </view>
+        </view>
+      </view>
+
+      <view v-else-if="type === 'JOB_SEEK'" class="block">
+        <view class="field">
+          <text class="label">期望岗位</text>
+          <input v-model="jobSeek.desiredRoles" class="input" placeholder="如：厨师/服务员，可多填" />
+        </view>
+        <view class="two-cols">
+          <view class="field">
+            <text class="label">期望薪资下限</text>
+            <input v-model.number="jobSeek.salaryMin" class="input" type="number" placeholder="例如 7000" />
+          </view>
+          <view class="field">
+            <text class="label">期望薪资上限</text>
+            <input v-model.number="jobSeek.salaryMax" class="input" type="number" placeholder="可选" />
+          </view>
+        </view>
+        <view class="two-cols">
+          <view class="field">
+            <text class="label">工作年限</text>
+            <input v-model.number="jobSeek.workYears" class="input" type="number" placeholder="例如 3" />
+          </view>
+          <view class="field">
+            <text class="label">年龄</text>
+            <input v-model.number="jobSeek.age" class="input" type="number" placeholder="可选" />
+          </view>
+        </view>
+        <view class="field">
+          <text class="label">擅长菜系/简介</text>
+          <input v-model="jobSeek.cuisines" class="input" placeholder="如：川菜、快餐、切配" />
+        </view>
+      </view>
+
+      <view v-else class="block">
+        <view class="field">
+          <text class="label">品牌/项目名称</text>
+          <input v-model="franchise.brandName" class="input" placeholder="如：某某奶茶加盟" />
+        </view>
+        <view class="field">
+          <text class="label">品类</text>
+          <input v-model="franchise.category" class="input" placeholder="如：中餐/火锅/茶饮" />
+        </view>
+        <view class="field">
+          <text class="label">投资金额</text>
+          <input v-model="franchise.investmentDesc" class="input" placeholder="如：20-50万/面议" />
+        </view>
+        <view class="field">
+          <text class="label">加盟说明</text>
+          <textarea v-model="franchise.franchiseDesc" class="textarea" placeholder="请说明品牌优势、支持政策、门店要求等" />
+        </view>
+      </view>
+
       <view v-if="currentStatus" class="status-bar">当前状态：{{ currentStatus }}</view>
       <button class="primary" :loading="saving" @click="saveDraft">{{ isEditMode ? "保存修改" : "保存草稿" }}</button>
       <button class="ghost" :disabled="!lastPostId" :loading="submitting" @click="submit">
@@ -159,16 +247,30 @@ import { isLoggedIn } from "@/api/request";
 import {
   fetchEditablePost,
   fetchUploadToken,
+  saveFranchiseDraft,
+  saveJobSeekDraft,
   saveRecruitDraft,
+  saveRentDraft,
   saveTransferDraft,
   submitPost,
+  updateFranchiseDraft,
+  updateJobSeekDraft,
   updateRecruitDraft,
+  updateRentDraft,
   updateTransferDraft,
   uploadImageToMinio,
 } from "@/api/post";
 import RegionPicker from "@/components/RegionPicker.vue";
 
-const type = ref<"RECRUIT" | "TRANSFER">("RECRUIT");
+type PostType = "RECRUIT" | "TRANSFER" | "RENT" | "JOB_SEEK" | "FRANCHISE";
+const type = ref<PostType>("RECRUIT");
+const typeOptions: Array<{ label: string; value: PostType }> = [
+  { label: "招聘", value: "RECRUIT" },
+  { label: "转让", value: "TRANSFER" },
+  { label: "出租", value: "RENT" },
+  { label: "求职", value: "JOB_SEEK" },
+  { label: "加盟", value: "FRANCHISE" },
+];
 const salaryTypes = ["MONTHLY", "NEGOTIABLE"];
 
 const region = ref<{ cityId?: number; districtId?: number; label?: string }>({});
@@ -200,6 +302,36 @@ const transfer = ref({
   feeNegotiable: 0,
   includeEquipment: 1,
   operating: 1,
+});
+
+const rent = ref({
+  areaSqm: 80,
+  rentMonthly: undefined as number | undefined,
+  rentNegotiable: 0,
+  entryFee: undefined as number | undefined,
+  entryFeeNegotiable: 0,
+  canCatering: 1,
+  canOpenFlame: 0,
+  floorDesc: "",
+  publisherIdentity: "OWNER",
+});
+
+const jobSeek = ref({
+  desiredRoles: "",
+  workYears: undefined as number | undefined,
+  cuisines: "",
+  salaryMin: undefined as number | undefined,
+  salaryMax: undefined as number | undefined,
+  gender: "",
+  age: undefined as number | undefined,
+  intro: "",
+});
+
+const franchise = ref({
+  brandName: "",
+  category: "",
+  investmentDesc: "",
+  franchiseDesc: "",
 });
 
 const saving = ref(false);
@@ -240,6 +372,7 @@ function validateForm() {
       return "招聘人数需在 1-99 之间";
     }
   } else {
+    if (type.value === "TRANSFER") {
     if (!transfer.value.shopCategory.trim()) return "请填写经营类型";
     if (!transfer.value.areaSqm || transfer.value.areaSqm <= 0) return "面积必须大于 0";
     if (!transfer.value.rentNegotiable && (!transfer.value.rentMonthly || transfer.value.rentMonthly <= 0)) {
@@ -247,6 +380,22 @@ function validateForm() {
     }
     if (!transfer.value.feeNegotiable && (transfer.value.transferFee === undefined || transfer.value.transferFee < 0)) {
       return "请填写转让费，或选择转让费面议";
+    }
+    } else if (type.value === "RENT") {
+      if (!rent.value.areaSqm || rent.value.areaSqm <= 0) return "面积必须大于 0";
+      if (!rent.value.rentNegotiable && (!rent.value.rentMonthly || rent.value.rentMonthly <= 0)) {
+        return "请填写月租金，或选择月租面议";
+      }
+    } else if (type.value === "JOB_SEEK") {
+      if (!jobSeek.value.desiredRoles.trim()) return "请填写期望岗位";
+      if (jobSeek.value.salaryMin && jobSeek.value.salaryMax && jobSeek.value.salaryMax < jobSeek.value.salaryMin) {
+        return "期望薪资上限不能低于下限";
+      }
+      if (jobSeek.value.age && (jobSeek.value.age < 16 || jobSeek.value.age > 80)) return "年龄需在 16-80 之间";
+    } else if (type.value === "FRANCHISE") {
+      if (!franchise.value.brandName.trim()) return "请填写品牌/项目名称";
+      if (!franchise.value.category.trim()) return "请填写品类";
+      if (franchise.value.franchiseDesc.trim().length < 10) return "加盟说明至少 10 个字";
     }
   }
   return "";
@@ -296,7 +445,7 @@ async function saveDraft() {
         const res = await saveRecruitDraft(payload);
         lastPostId.value = res.data.postId;
       }
-    } else {
+    } else if (type.value === "TRANSFER") {
       const payload = {
         ...base,
         shopCategory: transfer.value.shopCategory,
@@ -312,6 +461,59 @@ async function saveDraft() {
         await updateTransferDraft(lastPostId.value, payload);
       } else {
         const res = await saveTransferDraft(payload);
+        lastPostId.value = res.data.postId;
+      }
+    } else if (type.value === "RENT") {
+      const payload = {
+        ...base,
+        areaSqm: rent.value.areaSqm,
+        rentMonthly: rent.value.rentNegotiable ? undefined : rent.value.rentMonthly,
+        rentNegotiable: rent.value.rentNegotiable,
+        entryFee: rent.value.entryFeeNegotiable ? undefined : rent.value.entryFee,
+        entryFeeNegotiable: rent.value.entryFeeNegotiable,
+        canCatering: rent.value.canCatering,
+        canOpenFlame: rent.value.canOpenFlame,
+        floorDesc: rent.value.floorDesc,
+        publisherIdentity: rent.value.publisherIdentity,
+      };
+      if (isEditMode.value && lastPostId.value) {
+        await updateRentDraft(lastPostId.value, payload);
+      } else {
+        const res = await saveRentDraft(payload);
+        lastPostId.value = res.data.postId;
+      }
+    } else if (type.value === "JOB_SEEK") {
+      const payload = {
+        ...base,
+        desiredRoles: jobSeek.value.desiredRoles,
+        desiredCities: String(region.value.cityId || ""),
+        desiredDistricts: String(region.value.districtId || ""),
+        workYears: jobSeek.value.workYears,
+        cuisines: jobSeek.value.cuisines,
+        salaryMin: jobSeek.value.salaryMin,
+        salaryMax: jobSeek.value.salaryMax,
+        gender: jobSeek.value.gender,
+        age: jobSeek.value.age,
+        intro: jobSeek.value.intro || form.value.description,
+      };
+      if (isEditMode.value && lastPostId.value) {
+        await updateJobSeekDraft(lastPostId.value, payload);
+      } else {
+        const res = await saveJobSeekDraft(payload);
+        lastPostId.value = res.data.postId;
+      }
+    } else {
+      const payload = {
+        ...base,
+        brandName: franchise.value.brandName,
+        category: franchise.value.category,
+        investmentDesc: franchise.value.investmentDesc,
+        franchiseDesc: franchise.value.franchiseDesc,
+      };
+      if (isEditMode.value && lastPostId.value) {
+        await updateFranchiseDraft(lastPostId.value, payload);
+      } else {
+        const res = await saveFranchiseDraft(payload);
         lastPostId.value = res.data.postId;
       }
     }
@@ -396,7 +598,9 @@ onLoad(async (query) => {
     const post = data.post || {};
     const ext = data.ext || {};
     const imgList = (data.images || []) as Array<{ url?: string }>;
-    type.value = post.postType === "TRANSFER" ? "TRANSFER" : "RECRUIT";
+    type.value = ["RECRUIT", "TRANSFER", "RENT", "JOB_SEEK", "FRANCHISE"].includes(post.postType)
+      ? post.postType
+      : "RECRUIT";
     currentStatus.value = post.status || "";
     form.value.title = post.title || "";
     form.value.address = post.address || "";
@@ -415,7 +619,7 @@ onLoad(async (query) => {
       recruit.value.salaryMax = ext.salaryMax;
       recruit.value.provideBoard = ext.provideBoard ?? 0;
       recruit.value.headcount = ext.headcount ?? 1;
-    } else {
+    } else if (type.value === "TRANSFER") {
       transfer.value.shopCategory = ext.shopCategory || "";
       transfer.value.areaSqm = ext.areaSqm || 60;
       transfer.value.rentMonthly = ext.rentMonthly;
@@ -424,6 +628,30 @@ onLoad(async (query) => {
       transfer.value.feeNegotiable = ext.feeNegotiable ?? 0;
       transfer.value.includeEquipment = ext.includeEquipment ?? 1;
       transfer.value.operating = ext.operating ?? 1;
+    } else if (type.value === "RENT") {
+      rent.value.areaSqm = ext.areaSqm || 80;
+      rent.value.rentMonthly = ext.rentMonthly;
+      rent.value.rentNegotiable = ext.rentNegotiable ? 1 : 0;
+      rent.value.entryFee = ext.entryFee;
+      rent.value.entryFeeNegotiable = ext.entryFeeNegotiable ? 1 : 0;
+      rent.value.canCatering = ext.canCatering ? 1 : 0;
+      rent.value.canOpenFlame = ext.canOpenFlame ? 1 : 0;
+      rent.value.floorDesc = ext.floorDesc || "";
+      rent.value.publisherIdentity = ext.publisherIdentity || "OWNER";
+    } else if (type.value === "JOB_SEEK") {
+      jobSeek.value.desiredRoles = ext.desiredRoles || "";
+      jobSeek.value.workYears = ext.workYears;
+      jobSeek.value.cuisines = ext.cuisines || "";
+      jobSeek.value.salaryMin = ext.salaryMin;
+      jobSeek.value.salaryMax = ext.salaryMax;
+      jobSeek.value.gender = ext.gender || "";
+      jobSeek.value.age = ext.age;
+      jobSeek.value.intro = ext.intro || "";
+    } else {
+      franchise.value.brandName = ext.brandName || "";
+      franchise.value.category = ext.category || "";
+      franchise.value.investmentDesc = ext.investmentDesc || "";
+      franchise.value.franchiseDesc = ext.franchiseDesc || "";
     }
   } catch (e) {
     uni.showToast({ title: e instanceof Error ? e.message : "加载编辑数据失败", icon: "none" });

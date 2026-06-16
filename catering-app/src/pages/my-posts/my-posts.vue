@@ -2,7 +2,7 @@
   <view class="page">
     <view class="hero">
       <text class="title">我的发布</text>
-      <text class="subtitle">阶段2状态流转：草稿 → 待审核 → 已通过 / 已驳回</text>
+      <text class="subtitle">查看审核进度，驳回后可修改并重新提交</text>
     </view>
 
     <scroll-view scroll-x class="tabs-scroll">
@@ -80,7 +80,7 @@ function actionHint(v: string) {
     DRAFT: "点击继续编辑并提交",
     PENDING: "运营审核中，请耐心等待",
     REJECTED: "点击修改后可重新提交",
-    EXPIRED: "已过期，后续阶段支持重新发布",
+    EXPIRED: "已过期，可重新编辑发布",
     OFFLINE: "已下架",
   };
   return map[v] || "点击查看";
@@ -105,10 +105,6 @@ function switchStatus(v: string) {
 }
 
 function goEdit(post: MyPostItem) {
-  if (post.postType !== "RECRUIT" && post.postType !== "TRANSFER") {
-    uni.showToast({ title: "该类型编辑将于后续支持", icon: "none" });
-    return;
-  }
   uni.navigateTo({ url: `/pages/publish/publish?postId=${post.id}` });
 }
 

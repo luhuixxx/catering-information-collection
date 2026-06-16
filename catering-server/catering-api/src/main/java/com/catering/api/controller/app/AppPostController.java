@@ -3,7 +3,10 @@ package com.catering.api.controller.app;
 import com.catering.api.security.model.AuthUserPrincipal;
 import com.catering.common.result.Result;
 import com.catering.service.post.PostService;
+import com.catering.service.post.dto.FranchisePostUpsertRequest;
+import com.catering.service.post.dto.JobSeekPostUpsertRequest;
 import com.catering.service.post.dto.MyPostVO;
+import com.catering.service.post.dto.RentPostUpsertRequest;
 import com.catering.service.post.dto.RecruitPostUpsertRequest;
 import com.catering.service.post.dto.TransferPostUpsertRequest;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 import java.util.List;
 
-@Tag(name = "App - Post Stage2")
+@Tag(name = "App - Post")
 @RestController
 @RequestMapping("/api/app/posts")
 @RequiredArgsConstructor
@@ -44,6 +47,30 @@ public class AppPostController {
                                                         Authentication authentication) {
         Long userId = ((AuthUserPrincipal) authentication.getPrincipal()).getUserId();
         return Result.ok(Map.of("postId", String.valueOf(postService.saveTransferDraft(userId, request))));
+    }
+
+    @Operation(summary = "保存出租草稿")
+    @PostMapping("/rent/draft")
+    public Result<Map<String, String>> saveRentDraft(@Valid @RequestBody RentPostUpsertRequest request,
+                                                     Authentication authentication) {
+        Long userId = ((AuthUserPrincipal) authentication.getPrincipal()).getUserId();
+        return Result.ok(Map.of("postId", String.valueOf(postService.saveRentDraft(userId, request))));
+    }
+
+    @Operation(summary = "保存求职草稿")
+    @PostMapping("/job-seek/draft")
+    public Result<Map<String, String>> saveJobSeekDraft(@Valid @RequestBody JobSeekPostUpsertRequest request,
+                                                        Authentication authentication) {
+        Long userId = ((AuthUserPrincipal) authentication.getPrincipal()).getUserId();
+        return Result.ok(Map.of("postId", String.valueOf(postService.saveJobSeekDraft(userId, request))));
+    }
+
+    @Operation(summary = "保存招商加盟草稿")
+    @PostMapping("/franchise/draft")
+    public Result<Map<String, String>> saveFranchiseDraft(@Valid @RequestBody FranchisePostUpsertRequest request,
+                                                          Authentication authentication) {
+        Long userId = ((AuthUserPrincipal) authentication.getPrincipal()).getUserId();
+        return Result.ok(Map.of("postId", String.valueOf(postService.saveFranchiseDraft(userId, request))));
     }
 
     @Operation(summary = "提交审核")
@@ -78,6 +105,36 @@ public class AppPostController {
                                        Authentication authentication) {
         Long userId = ((AuthUserPrincipal) authentication.getPrincipal()).getUserId();
         postService.updateTransferDraft(userId, Long.parseLong(postId), request);
+        return Result.ok();
+    }
+
+    @Operation(summary = "更新出租草稿")
+    @PutMapping("/{postId}/rent")
+    public Result<Void> updateRent(@PathVariable String postId,
+                                   @Valid @RequestBody RentPostUpsertRequest request,
+                                   Authentication authentication) {
+        Long userId = ((AuthUserPrincipal) authentication.getPrincipal()).getUserId();
+        postService.updateRentDraft(userId, Long.parseLong(postId), request);
+        return Result.ok();
+    }
+
+    @Operation(summary = "更新求职草稿")
+    @PutMapping("/{postId}/job-seek")
+    public Result<Void> updateJobSeek(@PathVariable String postId,
+                                      @Valid @RequestBody JobSeekPostUpsertRequest request,
+                                      Authentication authentication) {
+        Long userId = ((AuthUserPrincipal) authentication.getPrincipal()).getUserId();
+        postService.updateJobSeekDraft(userId, Long.parseLong(postId), request);
+        return Result.ok();
+    }
+
+    @Operation(summary = "更新招商加盟草稿")
+    @PutMapping("/{postId}/franchise")
+    public Result<Void> updateFranchise(@PathVariable String postId,
+                                        @Valid @RequestBody FranchisePostUpsertRequest request,
+                                        Authentication authentication) {
+        Long userId = ((AuthUserPrincipal) authentication.getPrincipal()).getUserId();
+        postService.updateFranchiseDraft(userId, Long.parseLong(postId), request);
         return Result.ok();
     }
 

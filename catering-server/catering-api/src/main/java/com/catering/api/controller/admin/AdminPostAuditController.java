@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
-@Tag(name = "Admin - Post Audit Stage2")
+@Tag(name = "Admin - Post Audit")
 @RestController
 @RequestMapping("/api/admin/posts")
 @RequiredArgsConstructor

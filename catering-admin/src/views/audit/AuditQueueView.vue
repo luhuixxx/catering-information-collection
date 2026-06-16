@@ -3,7 +3,7 @@
     <div class="page-head">
       <div>
         <h2>审核队列</h2>
-        <p>待审核信息将显示在此处，支持通过/驳回（阶段2闭环）</p>
+        <p>待审核信息将显示在此处，支持查看详情、通过和驳回。</p>
       </div>
       <div class="filters">
         <el-select v-model="postType" placeholder="全部类型" clearable style="width: 180px">

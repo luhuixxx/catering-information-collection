@@ -28,6 +28,11 @@ const router = createRouter({
           name: 'audit',
           component: () => import('@/views/audit/AuditQueueView.vue'),
         },
+        {
+          path: 'posts',
+          name: 'posts',
+          component: () => import('@/views/post/PostManageView.vue'),
+        },
       ],
     },
   ],
