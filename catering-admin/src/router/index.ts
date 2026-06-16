@@ -18,6 +18,11 @@ const router = createRouter({
           name: 'dashboard',
           component: () => import('@/views/dashboard/DashboardView.vue'),
         },
+        {
+          path: 'regions',
+          name: 'regions',
+          component: () => import('@/views/region/RegionManageView.vue'),
+        },
       ],
     },
   ],
